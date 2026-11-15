@@ -156,13 +156,21 @@ DWORD WINAPI CUpdateCheck(LPVOID lparam) {
 					//isConnectionFailed = false;
 					res = res.substr(pos + 8);
 					res = res.substr(0, res.find("\""));
+					int vcodes[4] = { 0 }, rcodes[4] = { 0 };
+					//size_t pos = 0, newpos = 0;
 					int ndots = 0;
 					for (auto i = res.begin(); i != res.end(); i++)
 						if (*i == '.')
 							ndots++;
 					while (ndots++ < 3)
 						res += ".0";
-					if (res.compare(GetAppVersion(false)) > 0) {
+					//while ((newpos = res.find(".", pos)) != string::npos) {
+					//	vcodes[ndots] = atoi(res.substr(pos, newpos).c_str());
+					//	pos = newpos + 1;
+					//	ndots++;
+					//}
+					//string eres = GetAppVersion(false);
+					if (res.compare(GetAppVersion(false)) != 0) {
 						// new version detected!
 						ShowNotification(niData, "Update available!", "Latest version is " + res);
 						isNewVersion = true;

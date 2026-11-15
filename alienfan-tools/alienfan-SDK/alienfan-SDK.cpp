@@ -5,7 +5,7 @@
 
 #pragma warning(disable:4242)
 
-//#define _TRACE_
+#define _TRACE_
 
 typedef BOOLEAN (WINAPI *ACPIF)(LPWSTR, LPWSTR);
 
@@ -74,6 +74,12 @@ namespace AlienFan_SDK {
 							printf("Loading complete - %s.\n", activated ? "success" : "failed");
 #endif
 						}
+#ifdef _TRACE_
+						else {
+							DWORD err = GetLastError();
+							printf("KDL failed to load driver (%s - %x)!\n", oacpi ? "No driver point" : "No LCD", err);
+						}
+#endif
 						// In any case, unload dll
 						FreeLibrary(kdl);
 					}
