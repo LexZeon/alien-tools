@@ -297,6 +297,7 @@ void OnSelChanged()
 		// Destroy the current child dialog box, if any.
 		if (pHdr->hwndDisplay)
 			DestroyWindow(pHdr->hwndDisplay);
+			//SendMessage(pHdr->hwndDisplay, WM_DESTROY, 0, 0);
 
 		pHdr->hwndDisplay = CreateDialogIndirect(hInst, (DLGTEMPLATE*)pHdr->apRes[tabSel], hwndDlg, pHdr->apProc[tabSel]);
 		ResizeTab(pHdr->hwndDisplay);

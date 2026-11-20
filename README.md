@@ -31,7 +31,7 @@ It utilizes proprietary Alienware function calls inside ACPI BIOS (the same used
 ## Security and privacy
 
 In case you install tools version between `4.2.1` and `6.4.3.2`, **Anti-viruses can detect virus into project package**.  
-It's not a virus, you can read why it happened [here](https://github.com/T-Troll/alienfx-tools/wiki/Why-antivirus-complain-about-some-alienfx-tools-components%3F).  
+It's not a virus, you can read why it happened [here](https://github.com/T-Troll/alien-tools/wiki/Why-antivirus-complain-about-some-alien-tools-components%3F).  
 Please add application folder into anti-virus exception list.
 
 - `alienfan-gui` and `alienfan-cli` always require Administrator rights (for communication with hardware).
@@ -46,25 +46,25 @@ Please add application folder into anti-virus exception list.
 - All the tools don't collect or share any personal data. Some hardware data collected (but not shared) during hardware detection process.
 
 ## Installation
-- Download the latest release archive or installer package from [here](https://github.com/T-Troll/alienfx-tools/releases).
+- Download the latest release archive or installer package from [here](https://github.com/T-Troll/alien-tools/releases).
 - Unpack the archive to any directory of your choice or just run the installer.
 - In case you are using .zip archive and have Intel system, copy files from `DPTF` folder to `<Windows folder>\System32\drivers\DriverData\Intel\DPTF\dv\`
 - Run `alienrgb-gui` or `alienrgb-cli probe` to check and set light names (light control tools will have limited functionality without this step).
 - (Optional) `Ambient` effect mode uses DirectX for screen capturing, so you need to download and install it from [here](https://www.microsoft.com/en-us/download/details.aspx?id=35). Other modes don't require it, so you need it if you plan to use `Ambient` effects only.
 - (Optional) For LightFX-enabled games/applications, copy `LightFx.dll` into game/application folder or into `%windir%\System32` for use it with all light-enabled applications.
 - (Optional) For `alienrgb-cli` high-level support, both of my emulated (see above) or Alienware LightFX DLLs should be installed on your computer. These are installed automatically with Alienware Command Center, and the program should pick them up. You also should enable Alienfx API into AWCC to utilize high-level access: Settings-Misc at Metro version (new), right button context menu, then "Allow 3rd-party applications" in older Desktop version. 
-- (Optional) For the fan control, it's highly recommended to set correct max. boost values. You can do it at any GUI app or by running `alienfx-cli setover` command.
+- (Optional) For the fan control, it's highly recommended to set correct max. boost values. You can do it at any GUI app or by running `alienrgb-cli setover` command.
 - (Optional) You can install and run `Libre Hardware Monitor` before running fan control app - this provide more sensors to control.
 
-Please read [How to start](https://github.com/T-Troll/alienfx-tools/wiki/How-to-start-(Beginner's-guide)-for-release-v6.x.x.x) guide first!
+Please read [How to start](https://github.com/T-Troll/alien-tools/wiki/How-to-start-(Beginner's-guide)-for-release-v6.x.x.x) guide first!
 
 ## Supported hardware:
 
 Light control: Virtually any Alienware/Dell G-series (with Alienware keyboard) notebook and desktop, some Alienware mouses, some Alienware keyboards, Alienware monitors (except "F"-series (last letter of the model)).  
 Fan control: Modern Alienware/Dell G-Series notebooks (any m-series, x-series, Area51m), Aurora R7 (and later model) desktops.
 
-Project Wiki has [more details and the list of tested devices](https://github.com/T-Troll/alienfx-tools/wiki/Supported-and-tested-devices-list).  
-If your light device is not supported, you can [help me support it](https://github.com/T-Troll/alienfx-tools/wiki/How-to-collect-data-for-the-new-light-device).  
+Project Wiki has [more details and the list of tested devices](https://github.com/T-Troll/alien-tools/wiki/Supported-and-tested-devices-list).  
+If your light device is not supported, you can [help me support it](https://github.com/T-Troll/alien-tools/wiki/How-to-collect-data-for-the-new-light-device).  
 In case of issues with fan control, please open issue here or contact me via Discord support server.
 
 ## Light system reset

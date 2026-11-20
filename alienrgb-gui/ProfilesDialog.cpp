@@ -82,6 +82,7 @@ void RefreshDeviceList(HWND hDlg) {
 					SetSlider(sTip1, b->globalDelay);
 					c1 = b->effColor1; c2 = b->effColor2;
 				}
+				EnableWindow(GetDlgItem(hDlg, IDC_SLIDER_TEMPO), b != NULL);
 
 				RedrawButton(GetDlgItem(hDlg, IDC_BUTTON_EFFCLR1), MakeRGB(c1));
 				RedrawButton(GetDlgItem(hDlg, IDC_BUTTON_EFFCLR2), MakeRGB(c2));
@@ -95,6 +96,7 @@ void RefreshDeviceList(HWND hDlg) {
 					SetSlider(sTip2, b->globalDelay);
 					c1 = b->effColor1; c2 = b->effColor2;
 				}
+				EnableWindow(GetDlgItem(hDlg, IDC_SLIDER_KEYTEMPO), b != NULL);
 
 				RedrawButton(GetDlgItem(hDlg, IDC_BUTTON_EFFCLR3), MakeRGB(c1));
 				RedrawButton(GetDlgItem(hDlg, IDC_BUTTON_EFFCLR4), MakeRGB(c2));
@@ -160,16 +162,17 @@ BOOL CALLBACK DeviceEffectDialog(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 			case CBN_SELCHANGE:
 			{
 				byte newEffect = (byte)ComboBox_GetItemData(GetDlgItem(hDlg, LOWORD(wParam)), ComboBox_GetCurSel(GetDlgItem(hDlg, LOWORD(wParam))));
-				if (b)
-					b->globalEffect = newEffect;
-				else {
-					prof->effects[activeEffectDevice->devID].push_back({ {0}, {0}, newEffect, 5, (byte)(LOWORD(wParam) == IDC_GLOBAL_EFFECT ? 1 : 2) });
-					b = &prof->effects[activeEffectDevice->devID].back();
-				}
 				if (!newEffect) {
-					b = FindDevEffect(b->globalMode, true);
-					//if (prof->id == conf->activeProfile->id)
-					//	fxhl->UpdateGlobalEffect(activeEffectDevice, true);
+					if (b)
+						FindDevEffect(b->globalMode, true);
+				}
+				else {
+					if (b)
+						b->globalEffect = newEffect;
+					else {
+						prof->effects[activeEffectDevice->devID].push_back({ { 0 },{ 0 }, newEffect, 5, (byte)(LOWORD(wParam) == IDC_GLOBAL_EFFECT ? 1 : 2) });
+						b = &prof->effects[activeEffectDevice->devID].back();
+					}
 				}
 				RefreshDeviceList(hDlg);
 			} break;
@@ -200,16 +203,14 @@ BOOL CALLBACK DeviceEffectDialog(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 	} break;
 	case WM_HSCROLL:
 	{
-		if (prof)
+		if (b = FindDevEffect((HWND)lParam == eff_tempo ? 1 : 2))
 			switch (LOWORD(wParam)) {
 			case TB_THUMBPOSITION: case TB_ENDTRACK:
 			{
-				if (b) {
 					b->globalDelay = (BYTE) SendMessage((HWND) lParam, TBM_GETPOS, 0, 0);
 					SetSlider((HWND)lParam == eff_tempo ? sTip1 : sTip2, b->globalDelay);
 					if (prof->id == conf->activeProfile->id)
 						fxhl->UpdateGlobalEffect(activeEffectDevice);
-				}
 			} break;
 			}
 	} break;

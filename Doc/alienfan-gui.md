@@ -1,6 +1,6 @@
 ## `alienfan-gui`
 
-![AlienFan-GUI](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/alienfan.png?raw=true)
+![AlienFan-GUI](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/alienfan.png?raw=true)
 
 GUI application for fan and power modes control.  
 Then you start it, you will see 2 main windows - Temperature sensors (with current and maximal (press "x" button at list head to reset it to current values) readings) and Fans (with current RPM readings), as well as separate Fan curve (graph).  

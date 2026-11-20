@@ -21,7 +21,7 @@ But what it can do, instead?
 - Control system settings like boost, power mode (thermal profile).
 - Can have a profile for any application you run, power source and even key pressed.
 
-Please read [How to start](https://github.com/T-Troll/alienfx-tools/wiki/How-to-start-(Beginner's-guide)) for more details about initial setup.
+Please read [How to start](https://github.com/T-Troll/alien-tools/wiki/How-to-start-(Beginner's-guide)) for more details about initial setup.
 
 ## Main screen
 
@@ -59,7 +59,7 @@ Rest of the screen is control block, it depends of function selected by tab:
 
 ### Colors tab
 
-!["Colors" tab](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/gui-colors-6.png?raw=true)
+!["Colors" tab](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/gui-colors-6.png?raw=true)
 
 `"Colors"` tab is set color and hardware effects for light. This setting will remain even if you exit application.
 
@@ -81,7 +81,7 @@ Please keep in mind, mixing different event modes for one light can provide unex
 
 ### Events Monitoring tab
 
-!["Events Monitoring" tab](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/gui-monitoring-6.png?raw=true)
+!["Events Monitoring" tab](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/gui-monitoring-6.png?raw=true)
 
 This tab designed to control "System Monitoring" software effect - it change zone colors based on system states and events - like power source changes, system load, temperatures.  
 
@@ -124,7 +124,7 @@ Effect color switches between "From" and "To" values in case system event occurs
 
 ### Ambient tab
 
-!["Ambient" tab](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/gui-ambient-6.png?raw=true)
+!["Ambient" tab](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/gui-ambient-6.png?raw=true)
 
 `Ambient` tab setting up "Ambient" (Ambient lights) software effect - zone colors will follow colors at you screen.  
 For gauge zones, zone will follow the difference between screen color and black.
@@ -142,7 +142,7 @@ Sliders below and right to screen area grid used to change grid density, providi
 
 ### Haptics tab
 
-!["Haptics" tab](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/gui-haptics-6.png?raw=true)
+!["Haptics" tab](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/gui-haptics-6.png?raw=true)
 
 This effect control zone lights color depends of the sound played (haptic effect).
 
@@ -159,7 +159,7 @@ Click color buttons for change group hi/low level colors.
 
 ### Grid Effect tab
 
-!["Grid effect" tab](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/gui-grideffect.png?raw=true)
+!["Grid effect" tab](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/gui-grideffect.png?raw=true)
 
 Grid effects is a group of software light effects, operating not with lights only, but also using it position on grid. It's like "Global effect" on some RGB keyboards, but have flexible controls and can have multiply trigger sources.
 
@@ -204,7 +204,7 @@ If the zone Gauge type set to "Off", all zone lights will morph between backgrou
 
 ### Devices and Grids tab
 
-!["Devices and Grids" tab](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/gui-devices-6.png?raw=true)
+!["Devices and Grids" tab](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/gui-devices-6.png?raw=true)
 
 This tab dedicated to assign device lights and set it into grids, so it doesn't have Zones block.
 
@@ -246,7 +246,7 @@ Left-click at already assigned cell to select corresponding light (and it's devi
 
 ## Fans and Power tab
 
-!["Fans and Power" tab](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/gui-fans-6.png?raw=true)
+!["Fans and Power" tab](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/gui-fans-6.png?raw=true)
 
 Fan settings and BIOS power modes can be defined at this tab.
 
@@ -299,7 +299,7 @@ Please keep in mind:
 
 ## Profiles tab
 
-!["Profiles" tab](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/gui-profiles-6.png?raw=true)
+!["Profiles" tab](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/gui-profiles-6.png?raw=true)
 
 `"Profiles"` tab control profile settings, like selecting default profile, per-profile monitoring control and automatic switch to this profile then the defined application run.  
 
@@ -317,7 +317,7 @@ The settings are:
 - "Run action" - You can select script/application which will be started after this profile activation.
 
 "Device effects" button open profile settings for device effect (supported for some devices like RGB keyboards):  
-![Device Effects](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/gui_deviceeffect.png?raw=true)  
+![Device Effects](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/gui_deviceeffect.png?raw=true)  
 At this dialog, you can select device supporting per-device effects and set it parameters - types, colors, tempo, color mode.  
 APIv5 (per-key RGB notebook keyboards) support hardware effect, APIv8 (external keyboards) support both hardware and key press effects.
 
@@ -340,7 +340,7 @@ In case "Profile auto switch" turned on at "Settings", active profile will be se
 
 ## Settings tab
 
-!["Settings" tab](https://github.com/T-Troll/alienfx-tools/blob/master/Doc/img/gui-settings-6.png?raw=true)
+!["Settings" tab](https://github.com/T-Troll/alien-tools/blob/master/Doc/img/gui-settings-6.png?raw=true)
 
 Global application and light system settings collected into this tab.
 

@@ -202,9 +202,9 @@ BOOL CALLBACK TabFanDialog(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
         }
         DrawFan();
     } break;
-    //case WM_DESTROY:
-
-    //    break;
+    case WM_DESTROY:
+        KillTimer(hDlg, 0);
+        break;
     }
     return 0;
 }
