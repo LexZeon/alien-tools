@@ -14,14 +14,18 @@ static char pathSEN[] = "\\_SB.PCI0.LPCB.EC0.SEN",
 			pathCHRG[] = "\\_SB.PCI0.LPCB.EC0.EB0S";
 namespace AlienFan_SDK {
 
+	bool Control::OpenDriver() {
+		acc = OpenAcpiDevice();
+		return acc && acc != INVALID_HANDLE_VALUE;
+	}
+
 	Control::Control() {
 
 #ifdef _TRACE_
 		printf("Driver activation started.\n");
 #endif
 		// do we already have service running?
-		activated = (acc = OpenAcpiDevice()) != INVALID_HANDLE_VALUE && acc;
-		if (!activated) {
+		if (!(activated = OpenDriver())) {
 #ifdef _TRACE_
 			printf("Driver not activated, trying to load driver...\n");
 #endif
@@ -37,7 +41,7 @@ namespace AlienFan_SDK {
 				)) {
 					InstallService(scManager, driverLocation);
 					if (DemandService(scManager)) {
-						activated = (acc = OpenAcpiDevice()) != INVALID_HANDLE_VALUE && acc;
+						activated = OpenDriver();
 						wrongEnvironment = !activated;
 					} else {
 						RemoveService(scManager);
@@ -69,7 +73,7 @@ namespace AlienFan_SDK {
 #ifdef _TRACE_
 							printf("Driver loaded, trying to open it... ");
 #endif
-							activated = (acc = OpenAcpiDevice()) != INVALID_HANDLE_VALUE && acc;
+							activated = OpenDriver();
 #ifdef _TRACE_
 							printf("Loading complete - %s.\n", activated ? "success" : "failed");
 #endif
@@ -98,7 +102,8 @@ namespace AlienFan_SDK {
 		}
 	}
 	Control::~Control() {
-		CloseAcpiDevice(acc);
+		if (acc)
+			CloseAcpiDevice(acc);
 #ifdef _SERVICE_WAY_
 		UnloadService();
 #endif

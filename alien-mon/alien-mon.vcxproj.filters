@@ -40,12 +40,12 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="alienfx-mon.rc">
+    <ResourceCompile Include="alien-mon.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="alienfx-mon.ico">
+    <Image Include="alien-mon.ico">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

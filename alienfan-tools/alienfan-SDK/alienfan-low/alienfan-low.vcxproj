@@ -4,6 +4,10 @@
   <Import Project="..\..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.7705\build\native\Microsoft.Windows.SDK.cpp.x64.props" Condition="Exists('..\..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.7705\build\native\Microsoft.Windows.SDK.cpp.x64.props')" />
   <Import Project="..\..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.7705\build\native\Microsoft.Windows.SDK.cpp.props" Condition="Exists('..\..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.7705\build\native\Microsoft.Windows.SDK.cpp.props')" />
   <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug_V1|x64">
+      <Configuration>Debug_V1</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -81,6 +85,16 @@
     <PlatformToolset>WindowsApplicationForDrivers10.0</PlatformToolset>
     <VCToolsVersion>14.50.35717</VCToolsVersion>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_V1|x64'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+    <CharacterSet>NotSet</CharacterSet>
+    <Driver_SpectreMitigation>false</Driver_SpectreMitigation>
+    <PlatformToolset>WindowsApplicationForDrivers10.0</PlatformToolset>
+    <VCToolsVersion>14.50.35717</VCToolsVersion>
+  </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
@@ -98,6 +112,10 @@
     <AllProjectIncludesArePublic>true</AllProjectIncludesArePublic>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_V1|x64'">
+    <AllProjectIncludesArePublic>true</AllProjectIncludesArePublic>
+    <IncludePath>C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\shared;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_V1|x64'">
     <AllProjectIncludesArePublic>true</AllProjectIncludesArePublic>
     <IncludePath>C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\shared;$(IncludePath)</IncludePath>
   </PropertyGroup>
@@ -149,6 +167,25 @@
       <Optimization>MinSpace</Optimization>
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <DebugInformationFormat>None</DebugInformationFormat>
+      <ExceptionHandling>false</ExceptionHandling>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <OmitFramePointers>true</OmitFramePointers>
+      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Lib>
+      <SubSystem>Windows</SubSystem>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_V1|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <ExceptionHandling>false</ExceptionHandling>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <IntrinsicFunctions>true</IntrinsicFunctions>

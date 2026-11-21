@@ -76,6 +76,7 @@ namespace AlienFan_SDK {
 #endif
 		//int ReadRamDirect(DWORD);
 		//int WriteRamDirect(DWORD, byte);
+		bool OpenDriver();
 
 	public:
 		Control();
