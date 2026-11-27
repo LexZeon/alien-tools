@@ -23,6 +23,12 @@ public sealed class AppSettings
     /// <summary>"VID:PID/id" -> region assignment ("ring:3", "logo", "other", "keyboard:1", "none").</summary>
     public Dictionary<string, string> LightRegions { get; set; } = new();
 
+    /// <summary>
+    /// "VID:PID" -> row boundaries of a per-key keyboard from row calibration: the first key id
+    /// of every row, then (last key id + 1). Ids run left to right, top to bottom.
+    /// </summary>
+    public Dictionary<string, List<int>> KeyRows { get; set; } = new();
+
     /// <summary>"VID:PID/id" -> light name. The shared alien-tools store keeps only the ANSI code page.</summary>
     public Dictionary<string, string> ZoneNames { get; set; } = new();
 

@@ -90,8 +90,38 @@ public sealed class SpatialLayout
         (0, RegionKind.Ring, 0, "灯环 0"), (62, RegionKind.Touchpad, 0, "触控板"),
     };
 
-    /// <summary>Per-key keyboards (API v5) number keys row by row, 16 ids per row (seen on the x16 R2).</summary>
+    /// <summary>Fallback grid for unknown per-key keyboards (API v5): ids row by row.</summary>
     public const int AutoKeysPerRow = 16, AutoKeyRows = 6;
+
+    /// <summary>
+    /// Alienware x16 R2 keyboard (0D62:2ABE): light id of every key, measured on hardware with
+    /// four photographed color-coded patterns. The controller uses a 20-column matrix
+    /// (id = 20 * row + column), with the right-hand media column wired into row 0 and Page Up
+    /// into row 5. Power, Space, Left, Page Down and Right have no id below 128 and are left out,
+    /// so effects never touch the power button. X, Y and W are in key units (17.2 x 6 board).
+    /// </summary>
+    private static readonly (int Id, string Label, double X, int Row, double W)[] X16R2Keys =
+    {
+        (0, "Esc", 0, 0, 1), (1, "F1", 1, 0, 1), (2, "F2", 2, 0, 1), (3, "F3", 3, 0, 1), (4, "F4", 4, 0, 1), (5, "F5", 5, 0, 1),
+        (6, "F6", 6, 0, 1), (7, "F7", 7, 0, 1), (8, "F8", 8, 0, 1), (9, "F9", 9, 0, 1), (10, "F10", 10, 0, 1), (11, "F11", 11, 0, 1),
+        (12, "F12", 12, 0, 1), (13, "Home", 13, 0, 1), (14, "End", 14, 0, 1), (15, "Del", 15, 0, 1),
+        (19, "Mic", 16.2, 1, 1), (16, "Mute", 16.2, 2, 1), (18, "Vol-", 16.2, 3, 1), (17, "Vol+", 16.2, 4, 1),
+        (20, "`", 0, 1, 1), (21, "1", 1, 1, 1), (22, "2", 2, 1, 1), (23, "3", 3, 1, 1), (24, "4", 4, 1, 1), (25, "5", 5, 1, 1),
+        (26, "6", 6, 1, 1), (27, "7", 7, 1, 1), (28, "8", 8, 1, 1), (29, "9", 9, 1, 1), (30, "0", 10, 1, 1), (31, "-", 11, 1, 1),
+        (32, "=", 12, 1, 1), (35, "Backspace", 13, 1, 2),
+        (40, "Tab", 0, 2, 1.5), (42, "Q", 1.5, 2, 1), (43, "W", 2.5, 2, 1), (44, "E", 3.5, 2, 1), (45, "R", 4.5, 2, 1), (46, "T", 5.5, 2, 1),
+        (47, "Y", 6.5, 2, 1), (48, "U", 7.5, 2, 1), (49, "I", 8.5, 2, 1), (50, "O", 9.5, 2, 1), (51, "P", 10.5, 2, 1), (52, "[", 11.5, 2, 1),
+        (53, "]", 12.5, 2, 1), (54, "\\", 13.5, 2, 1.5),
+        (61, "Caps", 0, 3, 1.75), (62, "A", 1.75, 3, 1), (63, "S", 2.75, 3, 1), (64, "D", 3.75, 3, 1), (65, "F", 4.75, 3, 1), (66, "G", 5.75, 3, 1),
+        (67, "H", 6.75, 3, 1), (68, "J", 7.75, 3, 1), (69, "K", 8.75, 3, 1), (70, "L", 9.75, 3, 1), (71, ";", 10.75, 3, 1), (72, "'", 11.75, 3, 1),
+        (74, "Enter", 12.75, 3, 2.25),
+        (81, "Shift", 0, 4, 2.25), (83, "Z", 2.25, 4, 1), (84, "X", 3.25, 4, 1), (85, "C", 4.25, 4, 1), (86, "V", 5.25, 4, 1), (87, "B", 6.25, 4, 1),
+        (88, "N", 7.25, 4, 1), (89, "M", 8.25, 4, 1), (90, ",", 9.25, 4, 1), (91, ".", 10.25, 4, 1), (92, "/", 11.25, 4, 1),
+        (94, "Shift", 12.25, 4, 1.75), (114, "PgUp", 14, 4, 1),
+        (100, "Ctrl", 0, 5, 1), (101, "Fn", 1, 5, 1), (103, "Win", 2, 5, 1), (104, "Alt", 3, 5, 1),
+        (111, "Alt", 9, 5, 1), (109, "Lock", 10, 5, 1), (112, "Copilot", 11, 5, 1.5),
+    };
+    private const double X16R2BoardWidth = 17.2;
 
     public static readonly SpatialLayout Empty = new(new List<LightRegion>());
 
@@ -265,6 +295,38 @@ public sealed class SpatialLayout
             .ToList();
         if (mapped.Count == 0 && simulated)
             mapped = KeyboardLayout.Keys.Select((k, i) => ((ushort)i, k.Code)).ToList();
+
+        if (mapped.Count == 0 && dev.Vid == 0x0D62 && dev.Pid == 0x2ABE && !simulated)
+        {
+            // measured map of the Alienware x16 R2 keyboard
+            var g = KeyboardFrame;
+            double kw = g.W / X16R2BoardWidth, kh = g.H / 6;
+            foreach (var (id, label, kx, row, w) in X16R2Keys)
+            {
+                double x = g.X + (kx + w / 2) * kw, y = g.Y + (row + 0.5) * kh;
+                region.Points.Add(new LayoutPoint(dev, (ushort)id, RegionKind.Keyboard, x, y, w * kw, kh, (x - g.X) / g.W, label));
+            }
+            return;
+        }
+
+        if (mapped.Count == 0 && s.KeyRows.TryGetValue(dev.IdText, out var bounds) && bounds.Count >= 2)
+        {
+            // row calibration: each row's keys spread across the keyboard width
+            var g = KeyboardFrame;
+            int rows = bounds.Count - 1;
+            double rh = g.H / rows;
+            for (int r = 0; r < rows; r++)
+            {
+                int from = bounds[r], to = bounds[r + 1], len = Math.Max(1, to - from);
+                double cw = g.W / len;
+                for (int i = 0; i < len; i++)
+                {
+                    double x = g.X + (i + 0.5) * cw, y = g.Y + (r + 0.5) * rh;
+                    region.Points.Add(new LayoutPoint(dev, (ushort)(from + i), RegionKind.Keyboard, x, y, cw, rh, (i + 0.5) / len, $"#{from + i}"));
+                }
+            }
+            return;
+        }
 
         if (mapped.Count == 0 && dev.Api == LightApi.V5)
         {
