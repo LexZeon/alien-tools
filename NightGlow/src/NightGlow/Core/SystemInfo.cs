@@ -31,6 +31,32 @@ public static class SystemInfo
         }
     }
 
+    private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string RunValue = "NightGlow";
+
+    /// <summary>
+    /// Start with Windows, in the notification area ("--tray"), for the current user only.
+    /// Setting it again rewrites the path, so it follows the copy that is running now.
+    /// </summary>
+    public static bool StartWithWindows
+    {
+        get
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey);
+                return key?.GetValue(RunValue) is string s && s.Length > 0;
+            }
+            catch { return false; }
+        }
+        set
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RunKey);
+            if (value && Environment.ProcessPath is { } exe) key.SetValue(RunValue, $"\"{exe}\" --tray");
+            else key.DeleteValue(RunValue, false);
+        }
+    }
+
     /// <summary>
     /// Detects the vendor control center. Both apps writing to the same light controller makes
     /// them overwrite each other, so the UI warns. NightGlow never stops the vendor software.

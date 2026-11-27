@@ -67,7 +67,7 @@ public sealed partial class PerformancePage : Page, IRefreshable
     private void RelaunchAdmin_Click(object sender, RoutedEventArgs e)
     {
         if (SystemInfo.RelaunchElevated())
-            Application.Current.Exit();
+            App.Quit();
         else
             ModeStatus.Text = "没有获得管理员权限（UAC 被取消）。";
     }

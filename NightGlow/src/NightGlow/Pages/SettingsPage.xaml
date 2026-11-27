@@ -21,6 +21,21 @@
             </Border>
 
             <Border Style="{StaticResource NgCard}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="后台运行" Style="{StaticResource NgSectionTitle}" Margin="0" />
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource NgMuted}">
+                        彩虹波、涟漪、星云这些软件灯效由 NightGlow 一帧一帧计算，NightGlow 退出后灯光会停在最后一帧。硬件灯效（静态、呼吸、硬件彩虹波等）由灯光控制器自己运行，退出后也继续。
+                    </TextBlock>
+                    <ToggleSwitch x:Name="TraySwitch" Header="关闭窗口后缩到托盘，灯效继续运行" OnContent="开" OffContent="关" Toggled="TraySwitch_Toggled" />
+                    <ToggleSwitch x:Name="StartupSwitch" Header="开机自动在后台运行（托盘），并恢复上次的灯效" OnContent="开" OffContent="关" Toggled="StartupSwitch_Toggled" />
+                    <TextBlock x:Name="StartupNote" TextWrapping="Wrap" Style="{StaticResource NgMuted}" Visibility="Collapsed" />
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource NgMuted}">
+                        要彻底退出：右键任务栏右下角的 NightGlow 图标（可能收在 ^ 里，可以把它拖到任务栏上常驻），选“退出”。
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource NgCard}">
                 <StackPanel Spacing="8">
                     <TextBlock Text="运行状态" Style="{StaticResource NgSectionTitle}" Margin="0" />
                     <TextBlock x:Name="CoreText" Style="{StaticResource NgMuted}" />

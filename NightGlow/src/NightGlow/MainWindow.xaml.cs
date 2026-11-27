@@ -25,6 +25,14 @@ public sealed partial class MainWindow : Window
         }
         ApplyTheme(App.Settings.Theme);
 
+        // × hides the window: software effects are computed by NightGlow and stop when it exits
+        AppWindow.Closing += (_, e) =>
+        {
+            if (App.IsExiting || !App.Settings.CloseToTray) return;
+            e.Cancel = true;
+            HideToTray(showHint: true);
+        };
+
         // --page=<home|lighting|effects|performance|settings> opens a page directly (handy for docs/screenshots).
         var pageArg = Environment.GetCommandLineArgs().FirstOrDefault(a => a.StartsWith("--page=", StringComparison.OrdinalIgnoreCase));
         NavigateTo(pageArg is null ? "home" : pageArg["--page=".Length..].ToLowerInvariant());
@@ -32,6 +40,45 @@ public sealed partial class MainWindow : Window
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
+
+    /// <summary>True while the window is hidden in the notification area.</summary>
+    public static bool IsHiddenInTray { get; private set; }
+
+    /// <summary>
+    /// Raised when the window is hidden to (true) or shown from (false) the notification area,
+    /// so pages can pause their previews. Static: the first page opens inside the constructor.
+    /// </summary>
+    public static event EventHandler<bool>? TrayHiddenChanged;
+
+    public void HideToTray(bool showHint)
+    {
+        AppWindow.Hide();
+        IsHiddenInTray = true;
+        App.Thermal.Paused = true;
+        TrayHiddenChanged?.Invoke(this, true);
+        if (showHint && !App.Settings.TrayHintShown)
+        {
+            App.Settings.TrayHintShown = true;
+            App.Settings.Save();
+            App.Tray?.ShowBalloon("NightGlow 还在后台运行",
+                "灯效会继续播放。图标在任务栏右下角（可能收在 ^ 里）：点它打开窗口，右键可以退出。");
+        }
+    }
+
+    public void ShowFromTray()
+    {
+        bool wasHidden = IsHiddenInTray;
+        IsHiddenInTray = false;
+        App.Thermal.Paused = false;
+        AppWindow.Show(true);
+        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized } p) p.Restore();
+        Activate();
+        SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        if (wasHidden) TrayHiddenChanged?.Invoke(this, false);
+    }
 
     /// <summary>Called once services have scanned hardware.</summary>
     public void OnServicesReady()

@@ -35,6 +35,17 @@ public sealed class AppSettings
     /// <summary>"VID:PID/id" -> key scan code (extended keys + 0xE000), from key calibration.</summary>
     public Dictionary<string, int> KeyMap { get; set; } = new();
 
+    // background running
+    /// <summary>Closing the window keeps NightGlow in the notification area, so software effects keep running.</summary>
+    public bool CloseToTray { get; set; } = true;
+    public bool TrayHintShown { get; set; }
+
+    /// <summary>The software effect running when NightGlow last exited; started again on launch.</summary>
+    public SavedEffect? LastEffect { get; set; }
+
+    /// <summary>Normal / Dim / Off on top of the effect, restored with it.</summary>
+    public int LastMode { get; set; }
+
     private static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NightGlow");
     private static string FilePath => Path.Combine(Dir, "settings.json");
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
@@ -59,4 +70,19 @@ public sealed class AppSettings
         }
         catch { /* settings are a convenience */ }
     }
+}
+
+/// <summary>An applied effect with its regions and parameters (stored in settings.json).</summary>
+public sealed class SavedEffect
+{
+    public string EffectId { get; set; } = "";
+    public List<string> Regions { get; set; } = new();
+    public string Color1 { get; set; } = "#FFFFFF";
+    public string Color2 { get; set; } = "#FFFFFF";
+    public int Speed { get; set; } = 5;
+    public int Brightness { get; set; } = 255;
+    public string Direction { get; set; } = "LeftToRight";
+    public string Palette { get; set; } = "rainbow";
+    public bool AutoRain { get; set; }
+    public int Duration { get; set; } = 4;
 }

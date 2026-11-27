@@ -91,7 +91,8 @@ public sealed partial class EffectsPage : Page, IRefreshable
         EffectGrid.SelectedItem = EffectCatalog.Find(s.EffectId) ?? EffectCatalog.All[0];
         _loading = false;
         Refresh();
-        _previewTimer.Start();
+        MainWindow.TrayHiddenChanged += Window_TrayHiddenChanged;
+        if (!MainWindow.IsHiddenInTray) _previewTimer.Start();
         MaybeAutoStartDemo();
     }
 
@@ -99,8 +100,16 @@ public sealed partial class EffectsPage : Page, IRefreshable
     {
         StopDemo();
         _previewTimer.Stop();
+        MainWindow.TrayHiddenChanged -= Window_TrayHiddenChanged;
         if (_applyTimer.IsEnabled) { _applyTimer.Stop(); _ = ApplyNowAsync(); }
         App.Lighting.LayoutChanged -= Lighting_LayoutChanged;
+    }
+
+    // nobody sees the preview while NightGlow sits in the tray (the lights keep running)
+    private void Window_TrayHiddenChanged(object? sender, bool hidden)
+    {
+        if (hidden) _previewTimer.Stop();
+        else _previewTimer.Start();
     }
 
     private void ScheduleApply()
@@ -131,6 +140,7 @@ public sealed partial class EffectsPage : Page, IRefreshable
     {
         LaptopView.SetSelected(SelectedKinds);
         if (_loading) return;
+        StopDemoOnUserChange();
         App.Settings.SelectedRegions = _chips.Where(c => c.IsChecked).Select(c => c.Kind.ToString()).ToList();
         UpdateRegionNote();
         ScheduleApply();
@@ -187,6 +197,7 @@ public sealed partial class EffectsPage : Page, IRefreshable
         LaptopView.InteractiveMode = _fx.Interactive;
         CanvasHint.Text = _fx.Interactive ? "点击任意位置放出波纹 · 区域在右侧选择" : "点击区域选中或取消";
         UpdateRegions();
+        StopDemoOnUserChange(demoControl: true);
         ScheduleApply();
     }
 
@@ -207,6 +218,7 @@ public sealed partial class EffectsPage : Page, IRefreshable
     private void Option_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_loading) return;
+        StopDemoOnUserChange(demoControl: true);
         App.Settings.Direction = WaveDirections.All[Math.Max(0, DirectionBox.SelectedIndex)].Dir.ToString();
         App.Settings.Palette = (PaletteGrid.SelectedItem as Palette)?.Id ?? "rainbow";
         UpdateOptionRows();
@@ -216,6 +228,7 @@ public sealed partial class EffectsPage : Page, IRefreshable
     private void Param_Changed(object sender, RangeBaseValueChangedEventArgs e)
     {
         if (_loading) return;
+        StopDemoOnUserChange();
         App.Settings.Speed = (int)SpeedSlider.Value;
         App.Settings.Brightness = (int)Math.Round(BrightSlider.Value * 2.55);
         App.Settings.Duration = (int)DurationSlider.Value;
@@ -242,6 +255,7 @@ public sealed partial class EffectsPage : Page, IRefreshable
     private void Rain_Toggled(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
+        StopDemoOnUserChange(demoControl: true);
         App.Settings.AutoRain = RainSwitch.IsOn;
         ScheduleApply();
     }
@@ -295,12 +309,13 @@ public sealed partial class EffectsPage : Page, IRefreshable
             UpdateSwatches();
         };
         var flyout = new Flyout { Content = picker };
-        flyout.Closed += (_, _) => ScheduleApply();
+        flyout.Closed += (_, _) => { StopDemoOnUserChange(); ScheduleApply(); };
         flyout.ShowAt(btn);
     }
 
     private async void Apply_Click(object sender, RoutedEventArgs e)
     {
+        StopDemo(); // "apply again" also ends the showcase, which would switch the effect again
         _applyTimer.Stop();
         await ApplyNowAsync();
     }
@@ -321,7 +336,9 @@ public sealed partial class EffectsPage : Page, IRefreshable
         var names = string.Join("、", kinds.Select(Regions.Name));
         ApplyStatus.Text = App.Lighting.IsSimulated
             ? $"演示模式：“{fx.Name}”→ {names}（没有发送到硬件）。"
-            : $"已应用“{fx.Name}”→ {names}。" + (fx.Kind == EffectKind.Software ? "关闭 NightGlow 后灯光停在最后一帧。" : "")
+            : $"已应用“{fx.Name}”→ {names}。" + (fx.Kind == EffectKind.Software
+                ? (App.Settings.CloseToTray ? "关闭窗口后 NightGlow 在托盘里继续运行灯效。" : "退出 NightGlow 后灯光停在最后一帧。")
+                : "")
               + (!kinds.Contains(RegionKind.Keyboard) && App.Lighting.Layout.Get(RegionKind.Keyboard) is not null ? " 注意：键盘没有选中，键盘不会变。" : "");
     }
 
@@ -388,10 +405,15 @@ public sealed partial class EffectsPage : Page, IRefreshable
             return;
         }
         var s = DemoSteps[_demoStep];
-        RainSwitch.IsOn = false;
-        DirectionBox.SelectedIndex = Math.Max(0, Array.FindIndex(WaveDirections.All, d => d.Dir == s.Dir));
-        PaletteGrid.SelectedItem = Palette.All.FirstOrDefault(p => p.Id == s.Palette) ?? Palette.All[0];
-        EffectGrid.SelectedItem = EffectCatalog.Find(s.FxId);
+        _demoDriving = true;
+        try
+        {
+            RainSwitch.IsOn = false;
+            DirectionBox.SelectedIndex = Math.Max(0, Array.FindIndex(WaveDirections.All, d => d.Dir == s.Dir));
+            PaletteGrid.SelectedItem = Palette.All.FirstOrDefault(p => p.Id == s.Palette) ?? Palette.All[0];
+            EffectGrid.SelectedItem = EffectCatalog.Find(s.FxId);
+        }
+        finally { _demoDriving = false; }
         if (EffectGrid.SelectedItem is not null) EffectGrid.ScrollIntoView(EffectGrid.SelectedItem);
         DemoCaption.Text = s.Caption;
         DemoCaptionZh.Text = s.CaptionZh;
@@ -412,6 +434,27 @@ public sealed partial class EffectsPage : Page, IRefreshable
         }
         if (DateTime.Now >= _demoStepEnd) NextDemoStep();
     }
+
+    private bool _demoDriving;
+
+    /// <summary>
+    /// The showcase switches effects every few seconds, so any change the user makes (effect,
+    /// option, region, color, slider) ends it first. <paramref name="demoControl"/>: the change
+    /// comes from a control the showcase sets itself (effect, direction, palette, rain), which
+    /// is ignored while it still shows the current step, in case the control reports it late.
+    /// </summary>
+    private void StopDemoOnUserChange(bool demoControl = false)
+    {
+        if (_demoTimer is null || _demoDriving) return;
+        if (demoControl && _demoStep >= 0 && _demoStep < DemoSteps.Length && MatchesDemoStep(DemoSteps[_demoStep])) return;
+        StopDemo();
+    }
+
+    private bool MatchesDemoStep(DemoStep s) =>
+        _fx?.Id == s.FxId
+        && WaveDirections.All[Math.Max(0, DirectionBox.SelectedIndex)].Dir == s.Dir
+        && (PaletteGrid.SelectedItem as Palette)?.Id == s.Palette
+        && !RainSwitch.IsOn;
 
     private void StopDemo()
     {

@@ -46,23 +46,21 @@ public partial class App : Application
         catch (UnauthorizedAccessException) { return false; } // held by an elevated instance
     }
 
-    private static void ActivateRunningInstance()
-    {
-        var self = Environment.ProcessId;
-        foreach (var p in System.Diagnostics.Process.GetProcessesByName("NightGlow"))
-        {
-            if (p.Id == self || p.MainWindowHandle == IntPtr.Zero) continue;
-            NativeWindowMethods.ShowWindow(p.MainWindowHandle, 9); // SW_RESTORE
-            NativeWindowMethods.SetForegroundWindow(p.MainWindowHandle);
-            break;
-        }
-    }
+    /// <summary>Notification-area icon; NightGlow keeps running software effects there with the window closed.</summary>
+    internal static TrayIcon? Tray { get; private set; }
+
+    /// <summary>Set once NightGlow is really quitting (closing the window then no longer hides it).</summary>
+    public static bool IsExiting { get; private set; }
+
+    /// <summary>"--tray": start hidden in the notification area (used by "start with Windows").</summary>
+    private static bool StartInTray => Environment.GetCommandLineArgs().Contains("--tray");
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         if (!TakeSingleInstance())
         {
-            ActivateRunningInstance();
+            // the running instance may be hidden in the tray: ask it to show its window
+            TrayIcon.SignalRunningInstance();
             Exit();
             return;
         }
@@ -74,16 +72,24 @@ public partial class App : Application
             Thermal = new ThermalService(DispatcherQueue.GetForCurrentThread());
 
             Window = new MainWindow();
-            Window.Closed += (_, _) =>
+            Window.Closed += (_, _) => Cleanup();
+
+            Tray = new TrayIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "NightGlow.ico"));
+            Tray.OpenRequested += () => Window.ShowFromTray();
+            Tray.ExitRequested += Quit;
+            Lighting.PropertyChanged += (_, e) =>
             {
-                Settings.Save();
-                Lighting.Dispose();
-                Thermal.Dispose();
+                if (e.PropertyName == nameof(LightingService.ActiveEffectName) && Tray is { } t)
+                    t.Tooltip = $"NightGlow · {Lighting.ActiveEffectName}";
             };
-            Window.Activate();
+
+            if (StartInTray) Window.HideToTray(showHint: false);
+            else Window.Activate();
 
             Thermal.Start();
             await Lighting.RefreshAsync();
+            // software effects are computed by NightGlow: start the one that ran last time again
+            await Lighting.RestoreLastEffectAsync();
             Window.OnServicesReady();
         }
         catch (Exception ex)
@@ -92,17 +98,27 @@ public partial class App : Application
             throw;
         }
     }
-}
 
-internal static partial class NativeWindowMethods
-{
-    [System.Runtime.InteropServices.LibraryImport("user32.dll")]
-    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-    internal static partial bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    /// <summary>Quits NightGlow: software effects stop and the lights keep their last frame.</summary>
+    public static void Quit()
+    {
+        IsExiting = true;
+        Cleanup();
+        Current.Exit();
+    }
 
-    [System.Runtime.InteropServices.LibraryImport("user32.dll")]
-    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-    internal static partial bool SetForegroundWindow(IntPtr hWnd);
+    private static bool _cleanedUp;
+
+    private static void Cleanup()
+    {
+        if (_cleanedUp) return;
+        _cleanedUp = true;
+        IsExiting = true;
+        Tray?.Dispose();
+        Settings.Save();
+        Lighting?.Dispose();
+        Thermal?.Dispose();
+    }
 }
 
 internal static class CrashLog

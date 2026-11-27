@@ -63,8 +63,9 @@ Also included: ✨ starfield, and the keyboard's built-in effects (static, breat
 - 🗺️ **Pick zones on a picture.** Click the laptop diagram to choose the keyboard, rear ring, logo or touchpad. Changes apply at once.
 - 🧭 **Light-finding wizard.** Lights up one LED at a time; click where you saw it on the laptop picture, or press Space if nothing lit. On the x16 R2 every light is already mapped.
 - ⌨️ **Key calibration.** For other per-key keyboards: press the key that is lit, and the keyboard learns its own layout. Keys are read only while the calibration box has focus.
-- ▶️ **One-click showcase.** Plays every software effect in turn, the way the demo video was made.
-- ⚡ **Performance presets.** Switch between the vendor presets your BIOS reports (Balanced, Performance, Cool, Quiet, Full Speed). Needs administrator rights. *Not yet verified on hardware in this preview.*
+- ▶️ **One-click showcase.** Plays every software effect in turn, the way the demo video was made. Changing anything, or pressing "Apply again", stops it.
+- 🔔 **Keeps running in the tray.** Software effects are computed by NightGlow, so closing the window hides it in the notification area and the lights keep moving. The last effect comes back on the next launch, and NightGlow can start with Windows in the tray (Settings, off by default). Right-click the tray icon to quit.
+- ⚡ **Performance presets.** Switch between the vendor presets your BIOS reports (Balanced, Performance, Cool, Quiet, Full Speed). Needs administrator rights. Verified on the x16 R2.
 - 🌙 **Dark, clean interface.** Five pages: Overview, Lights, Effects, Performance & cooling, Settings.
 
 <a id="download"></a>
@@ -149,8 +150,9 @@ NightGlow 是给 Alienware 笔记本用的灯光软件，基于开源的 [alien-
 - 🗺️ **在图上选区域。** 点笔记本示意图，选键盘、背部灯环、Logo 或触控板，改了立刻生效。
 - 🧭 **灯光识别向导。** 一次点亮一颗灯，你在笔记本示意图上点它亮的位置，没亮就按空格。x16 R2 的每颗灯都已经标好，不用再做。
 - ⌨️ **键位标定。** 给其他单键 RGB 键盘用：按下亮着的那个键，键盘就学会自己的布局。只在标定框有焦点时读取按键。
-- ▶️ **一键演示。** 依次播放所有软件灯效，演示视频就是这样录的。
-- ⚡ **性能预设。** 在 BIOS 提供的厂商预设之间切换（平衡、性能、凉爽、安静、全速），需要管理员权限。*这个预览版还没在真机上验证。*
+- ▶️ **一键演示。** 依次播放所有软件灯效，演示视频就是这样录的。改任何选项或点“重新应用”就会停止演示。
+- 🔔 **托盘常驻。** 软件灯效由 NightGlow 实时计算，所以关闭窗口只是缩到托盘，灯效继续播放。下次打开自动恢复上次的灯效，也可以在设置里打开“开机自动在后台运行”（默认关）。右键托盘图标可以退出。
+- ⚡ **性能预设。** 在 BIOS 提供的厂商预设之间切换（平衡、性能、凉爽、安静、全速），需要管理员权限。已在 x16 R2 上验证。
 - 🌙 **简洁的深色界面。** 五个页面：总览、灯光、灯效、性能与散热、设置。
 
 ### 🚀 下载和运行

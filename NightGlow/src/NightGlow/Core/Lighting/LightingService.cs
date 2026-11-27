@@ -96,13 +96,13 @@ public sealed partial class LightingService : ObservableObject, IDisposable
 
     public async Task SetZoneColorAsync(LightDevice dev, LightZone zone, Rgb color)
     {
-        _engine.Stop();
+        StopSoftwareEffect();
         await Run(b => { b.SetColor(dev.Index, zone.Id, color); b.Update(dev.Index); });
     }
 
     public async Task SetDeviceColorAsync(LightDevice dev, Rgb color)
     {
-        _engine.Stop();
+        StopSoftwareEffect();
         await Run(b => ApplyStatic(b, dev, color));
         ActiveEffectName = "静态";
     }
@@ -129,6 +129,7 @@ public sealed partial class LightingService : ObservableObject, IDisposable
     public async Task ApplyEffectAsync(EffectDefinition fx, EffectParameters p, IReadOnlyList<LayoutPoint> points)
     {
         _engine.Stop();
+        Remember(fx, p, points);
         p = p.For(fx);
         Mode = LightingMode.Normal;
         var devices = points.Select(pt => pt.Device).DistinctBy(d => d.Index).ToList();
@@ -161,6 +162,53 @@ public sealed partial class LightingService : ObservableObject, IDisposable
         ActiveEffectName = fx.Name;
     }
 
+    /// <summary>
+    /// Software effects stop with NightGlow, so the running one is saved and started again on the
+    /// next launch. Hardware effects keep running in the controllers by themselves.
+    /// </summary>
+    private void Remember(EffectDefinition fx, EffectParameters p, IReadOnlyList<LayoutPoint> points)
+    {
+        _settings.LastMode = (int)LightingMode.Normal;
+        _settings.LastEffect = fx.Kind != EffectKind.Software ? null : new SavedEffect
+        {
+            EffectId = fx.Id,
+            Regions = points.Select(pt => pt.Region).Distinct().Select(r => r.ToString()).ToList(),
+            Color1 = p.Color1.ToHex(),
+            Color2 = p.Color2.ToHex(),
+            Speed = p.Speed,
+            Brightness = p.Brightness,
+            Direction = p.Direction.ToString(),
+            Palette = p.PaletteId,
+            AutoRain = p.AutoRain,
+            Duration = p.Duration,
+        };
+        _settings.Save();
+    }
+
+    /// <summary>Starts the software effect that was running when NightGlow last exited.</summary>
+    public async Task<bool> RestoreLastEffectAsync()
+    {
+        var s = _settings.LastEffect;
+        if (s is null || EffectCatalog.Find(s.EffectId) is not { Kind: EffectKind.Software } fx) return false;
+        var kinds = s.Regions.Where(r => Enum.TryParse<RegionKind>(r, out _)).Select(Enum.Parse<RegionKind>).ToList();
+        var points = Layout.PointsIn(kinds);
+        if (points.Count == 0) return false;
+        var p = new EffectParameters(
+            Rgb.TryParse(s.Color1, out var c1) ? c1 : Rgb.White,
+            Rgb.TryParse(s.Color2, out var c2) ? c2 : Rgb.White,
+            Math.Clamp(s.Speed, 1, 10), (byte)Math.Clamp(s.Brightness, 0, 255))
+        {
+            Direction = Enum.TryParse<WaveDirection>(s.Direction, out var d) ? d : WaveDirection.LeftToRight,
+            PaletteId = s.Palette,
+            AutoRain = s.AutoRain,
+            Duration = Math.Clamp(s.Duration, 1, 10),
+        };
+        var mode = (LightingMode)Math.Clamp(_settings.LastMode, 0, 2);
+        await ApplyEffectAsync(fx, p, points);
+        if (mode != LightingMode.Normal) await SetModeAsync(mode);
+        return true;
+    }
+
     private static void SetDeviceBrightness(ILightingBackend b, LightDevice dev, byte value)
     {
         dev.Brightness = value;
@@ -175,6 +223,7 @@ public sealed partial class LightingService : ObservableObject, IDisposable
     public async Task SetModeAsync(LightingMode mode)
     {
         Mode = mode;
+        if (_settings.LastMode != (int)mode) { _settings.LastMode = (int)mode; _settings.Save(); }
         var devices = Devices.ToList();
         await Run(b =>
         {
@@ -191,7 +240,12 @@ public sealed partial class LightingService : ObservableObject, IDisposable
         });
     }
 
-    public void StopSoftwareEffect() => _engine.Stop();
+    /// <summary>Stops the software effect (lights keep the last frame) and forgets it for the next launch.</summary>
+    public void StopSoftwareEffect()
+    {
+        _engine.Stop();
+        if (_settings.LastEffect is not null) { _settings.LastEffect = null; _settings.Save(); }
+    }
 
     /// <summary>Static color on every zone; keyboards without named zones use their hardware static effect.</summary>
     internal static void ApplyStatic(ILightingBackend b, LightDevice dev, Rgb color)

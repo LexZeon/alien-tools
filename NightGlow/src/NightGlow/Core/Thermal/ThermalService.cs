@@ -77,8 +77,12 @@ public sealed partial class ThermalService : ObservableObject, IDisposable
 
     private int _pollPending;
 
+    /// <summary>No sensor polling while the window is hidden in the notification area.</summary>
+    public bool Paused { get; set; }
+
     private void QueuePoll()
     {
+        if (Paused) return;
         // Skip if the previous poll has not run yet (slow WMI), so the queue never grows.
         if (Interlocked.Exchange(ref _pollPending, 1) == 1) return;
         try { _queue.Add(() => { Interlocked.Exchange(ref _pollPending, 0); Poll(); }); }
