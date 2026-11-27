@@ -162,11 +162,20 @@ public sealed class LaptopCanvas : Grid
                 if (present) AddKeys(region!);
                 break;
             }
+            case RegionKind.Touchpad:
+            {
+                var f = SpatialLayout.TouchpadFrame;
+                outline = Frame(f, 10, present);
+                label = AddText(present ? "触控板" : "触控板（未标定）", f.X - (present ? 0.08 : 0.15), f.Cy - 0.024, 18, Label);
+                if (present)
+                    foreach (var pt in region!.Points) AddDot(pt, 22, 52);
+                break;
+            }
             default:
             {
                 var f = SpatialLayout.OtherFrame;
                 outline = Frame(f, 10, present);
-                label = AddText("其他灯光", f.X - 0.105, f.Cy - 0.024, 18, Label);
+                label = AddText("其他", f.X - 0.06, f.Cy - 0.024, 18, Label);
                 if (present)
                     foreach (var pt in region!.Points) AddDot(pt, 14, 30);
                 if (!present) { outline.Visibility = Visibility.Collapsed; label.Visibility = Visibility.Collapsed; }
@@ -291,6 +300,7 @@ public sealed class LaptopCanvas : Grid
         if (In(SpatialLayout.LogoFrame, x, y, 0.01)) return RegionKind.Logo;
         if (In(SpatialLayout.RingFrame, x, y, 0.03)) return RegionKind.Ring;
         if (In(SpatialLayout.KeyboardFrame, x, y, 0.03)) return RegionKind.Keyboard;
+        if (In(SpatialLayout.TouchpadFrame, x, y, 0.02)) return RegionKind.Touchpad;
         if (In(SpatialLayout.OtherFrame, x, y, 0.03)) return RegionKind.Other;
         return null;
     }

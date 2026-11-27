@@ -23,16 +23,17 @@ public sealed partial class ZoneRow : ObservableObject
     public string FlagText => Zone.IsPowerButton ? " · 电源键" : Zone.IsIndicator ? " · 指示灯" : "";
     public Rgb Color { get; set; } = Rgb.Black;
 
-    // region assignment: 0 auto, 1 ring, 2 logo, 3 other, 4 keyboard, 5 none
+    // region assignment: 0 auto, 1 ring, 2 logo, 3 touchpad, 4 other, 5 keyboard, 6 none
+    private const int NoneIndex = 6;
     [ObservableProperty] private int _regionIndex;
     [ObservableProperty] private double _order;
-    public bool HasOrder => RegionIndex is 1 or 4;
+    public bool HasOrder => RegionIndex is 1 or 5;
 
     /// <summary>Second-line hint: which region this light ends up in.</summary>
     public string RegionText => RegionIndex switch
     {
         0 => " · 自动识别为" + Regions.Name(SpatialLayout.GuessRegion(Device, Zone)),
-        5 => " · 不参与灯效",
+        NoneIndex => " · 不参与灯效",
         _ => "",
     };
 
@@ -45,19 +46,19 @@ public sealed partial class ZoneRow : ObservableObject
     }
     partial void OnOrderChanged(double value) => AssignmentChanged?.Invoke(this, EventArgs.Empty);
 
-    public static readonly RegionKind?[] IndexToKind = { null, RegionKind.Ring, RegionKind.Logo, RegionKind.Other, RegionKind.Keyboard, null };
+    public static readonly RegionKind?[] IndexToKind = { null, RegionKind.Ring, RegionKind.Logo, RegionKind.Touchpad, RegionKind.Other, RegionKind.Keyboard, null };
 
     public string? ToAssignment() => RegionIndex switch
     {
         0 => null,
-        5 => "none",
+        NoneIndex => "none",
         _ => SpatialLayout.FormatAssignment(IndexToKind[RegionIndex], double.IsNaN(Order) ? 0 : (int)Order),
     };
 
     public static (int Index, int Order) FromAssignment(string? s)
     {
         if (s is null) return (0, 0);
-        if (s == "none") return (5, 0);
+        if (s == "none") return (NoneIndex, 0);
         var (kind, order) = SpatialLayout.ParseAssignment(s);
         int idx = Array.IndexOf(IndexToKind, kind, 1);
         return (idx < 1 ? 0 : idx, order);
@@ -196,6 +197,7 @@ public sealed partial class LightingPage : Page, IRefreshable
             {
                 "ring" => ($"灯环 {ringCount + 1}", $"ring:{ringCount}"),
                 "logo" => ("Logo", "logo"),
+                "touchpad" => ("触控板", "touchpad"),
                 _ => ($"灯 {id}", "other"),
             };
             var zone = _device.Zones.FirstOrDefault(z => z.Id == id);

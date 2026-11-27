@@ -8,7 +8,7 @@ namespace NightGlow.Core.Lighting;
 /// </summary>
 internal sealed class EffectEngine
 {
-    private const int FrameMs = 33;              // ~30 fps for per-light devices
+    private const int FrameMs = 25;              // ~40 fps; a per-key keyboard needs ~7 HID reports per frame
     private const int WholeDeviceMinMs = 100;    // whole-keyboard hardware calls are heavier: max 10/s
 
     private readonly LightingService _svc;
@@ -37,7 +37,7 @@ internal sealed class EffectEngine
         var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(FrameMs));
         var lastWhole = new Dictionary<int, (double At, Rgb Color)>();
         var byDevice = points.GroupBy(pt => pt.Device.Index).ToList();
-        var pal = p.GetPalette();
+        var pal = p.GetPalette(fx);
         Task? inFlight = null;
 
         try

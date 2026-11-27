@@ -78,7 +78,7 @@ public sealed partial class LightingService : ObservableObject, IDisposable
     /// <summary>Call after zone names, region assignments or the key map changed.</summary>
     public void RebuildLayout()
     {
-        Layout = SpatialLayout.Build(Devices, _settings, IsSimulated);
+        Layout = SpatialLayout.Build(Devices, _settings, IsSimulated, IsSimulated ? "" : SystemInfo.MachineModel);
         LayoutChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -122,7 +122,15 @@ public sealed partial class LightingService : ObservableObject, IDisposable
         var devices = points.Select(pt => pt.Device).DistinctBy(d => d.Index).ToList();
         if (fx.Kind == EffectKind.Software)
         {
-            await Run(b => { foreach (var dev in devices) SetDeviceBrightness(b, dev, 255); });
+            await Run(b =>
+            {
+                foreach (var dev in devices)
+                {
+                    SetDeviceBrightness(b, dev, 255);
+                    // per-key keyboards: leave the firmware effect, so per-key colors show
+                    if (UsesPerKey(dev, points)) b.SetHardwareEffect(dev.Index, HardwareEffect.Off, 5, ColorMode.One, Rgb.Black, Rgb.Black);
+                }
+            });
             _engine.Start(fx, p, points);
             ActiveEffectName = fx.Name;
             return;
@@ -182,10 +190,18 @@ public sealed partial class LightingService : ObservableObject, IDisposable
             b.SetHardwareEffect(dev.Index, HardwareEffect.Static, 5, ColorMode.One, color, color);
     }
 
+    /// <summary>A keyboard driven key by key (needs the firmware effect switched off first).</summary>
+    private static bool UsesPerKey(LightDevice dev, IEnumerable<LayoutPoint> points) =>
+        dev.Api == LightApi.V5 && points.Any(pt => pt.Device.Index == dev.Index && !pt.IsWholeDevice);
+
     private static void ApplyColor(ILightingBackend b, LightDevice dev, List<LayoutPoint> lights, Rgb color)
     {
-        if (lights.Any(l => l.IsWholeDevice))
+        if (lights.Any(l => l.IsWholeDevice) || (dev.Api == LightApi.V5 && dev.HasHardwareEffects))
+        {
+            // keyboards: one hardware static color covers every key
             b.SetHardwareEffect(dev.Index, HardwareEffect.Static, 5, ColorMode.One, color, color);
+            return;
+        }
         var single = lights.Where(l => !l.IsWholeDevice).Select(l => (l.LightId, color)).ToList();
         if (single.Count > 0) b.SetColors(dev.Index, single);
     }
@@ -205,7 +221,7 @@ public sealed partial class LightingService : ObservableObject, IDisposable
         var zones = lights.Where(l => !l.IsWholeDevice).ToList();
         if (zones.Count == 0) return;
 
-        var pal = p.GetPalette();
+        var pal = p.GetPalette(fx);
         foreach (var pt in zones)
         {
             LightAction[] actions;

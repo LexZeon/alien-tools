@@ -73,7 +73,7 @@
 
                     <StackPanel Spacing="6">
                         <TextBlock Text="区域" Style="{StaticResource NgMuted}" />
-                        <ItemsControl x:Name="RegionList" Height="94">
+                        <ItemsControl x:Name="RegionList" Height="140">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="134" ItemHeight="44" />

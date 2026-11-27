@@ -1,17 +1,18 @@
 namespace NightGlow.Core.Lighting;
 
 /// <summary>Areas the user can select as a whole, like a vendor control center does.</summary>
-public enum RegionKind { Keyboard, Ring, Logo, Other }
+public enum RegionKind { Keyboard, Ring, Logo, Other, Touchpad }
 
 public static class Regions
 {
-    public static readonly RegionKind[] All = { RegionKind.Keyboard, RegionKind.Ring, RegionKind.Logo, RegionKind.Other };
+    public static readonly RegionKind[] All = { RegionKind.Keyboard, RegionKind.Ring, RegionKind.Logo, RegionKind.Touchpad, RegionKind.Other };
 
     public static string Name(RegionKind k) => k switch
     {
         RegionKind.Keyboard => "键盘",
         RegionKind.Ring => "背部灯环",
         RegionKind.Logo => "Logo",
+        RegionKind.Touchpad => "触控板",
         _ => "其他灯光",
     };
 
@@ -20,6 +21,7 @@ public static class Regions
         RegionKind.Keyboard => "",
         RegionKind.Ring => "",
         RegionKind.Logo => "",
+        RegionKind.Touchpad => "",
         _ => "",
     };
 }
@@ -65,7 +67,33 @@ public sealed class SpatialLayout
     public static readonly NRect RingFrame = new(0.17, 0.035, 0.66, 0.17);
     public static readonly NRect LogoFrame = new(0.46, 0.07, 0.08, 0.095);
     public static readonly NRect KeyboardFrame = new(0.065, 0.35, 0.87, 0.435);
-    public static readonly NRect OtherFrame = new(0.28, 0.85, 0.44, 0.1);
+    public static readonly NRect TouchpadFrame = new(0.40, 0.83, 0.20, 0.13);
+    public static readonly NRect OtherFrame = new(0.74, 0.86, 0.18, 0.08);
+
+    public static NRect FrameOf(RegionKind k) => k switch
+    {
+        RegionKind.Keyboard => KeyboardFrame,
+        RegionKind.Ring => RingFrame,
+        RegionKind.Logo => LogoFrame,
+        RegionKind.Touchpad => TouchpadFrame,
+        _ => OtherFrame,
+    };
+
+    /// <summary>
+    /// Chassis lights of the Alienware x16 R2 as the vendor control center numbers them
+    /// (rear "stadium" ring drawn as four corners, lid logo, touchpad, power button).
+    /// Used until the user identifies the lights. Not yet confirmed one by one on hardware;
+    /// a first test lit the ring in two colors when ids &lt; 32 and &gt;= 32 differed, which fits.
+    /// </summary>
+    private static readonly (ushort Id, RegionKind Kind, int Order, string Name)[] X16R2Chassis =
+    {
+        (0, RegionKind.Ring, 0, "灯环 左上"), (3, RegionKind.Ring, 1, "灯环 右上"),
+        (33, RegionKind.Ring, 2, "灯环 右下"), (30, RegionKind.Ring, 3, "灯环 左下"),
+        (61, RegionKind.Logo, 0, "外星人头"), (62, RegionKind.Touchpad, 0, "触控板"), (60, RegionKind.Other, 0, "电源键"),
+    };
+
+    /// <summary>Per-key keyboards (API v5) number keys row by row, 16 ids per row (seen on the x16 R2).</summary>
+    public const int AutoKeysPerRow = 16, AutoKeyRows = 6;
 
     public static readonly SpatialLayout Empty = new(new List<LightRegion>());
 
@@ -108,32 +136,45 @@ public sealed class SpatialLayout
         var n = z.Name.ToLowerInvariant();
         if (n.Contains('环') || n.Contains("灯带") || n.Contains("ring") || n.Contains("strip") || n.Contains("tron") || n.Contains("loop"))
             return RegionKind.Ring;
-        if (n.Contains("logo") || n.Contains("徽标") || n.Contains("标志") || n.Contains("head") || n.Contains("alien"))
+        if (n.Contains("logo") || n.Contains("徽标") || n.Contains("标志") || n.Contains("head") || n.Contains("alien") || n.Contains("外星人"))
             return RegionKind.Logo;
+        if (n.Contains("触控") || n.Contains("touchpad") || n.Contains("trackpad"))
+            return RegionKind.Touchpad;
         return RegionKind.Other;
     }
 
-    public static SpatialLayout Build(IEnumerable<LightDevice> devices, AppSettings s, bool simulated)
+    public static SpatialLayout Build(IEnumerable<LightDevice> devices, AppSettings s, bool simulated, string model = "")
     {
         var ring = new List<(LightDevice Dev, LightZone Z, int Order)>();
         var logo = new List<(LightDevice Dev, LightZone Z)>();
         var other = new List<(LightDevice Dev, LightZone Z)>();
+        var touchpad = new List<(LightDevice Dev, LightZone Z)>();
         var kbZones = new List<(LightDevice Dev, LightZone Z, int Order)>();
         var keyboard = new LightRegion { Kind = RegionKind.Keyboard };
+        bool x16r2 = model.Contains("x16 R2", StringComparison.OrdinalIgnoreCase);
 
         foreach (var dev in devices.Where(d => d.Present))
         {
-            foreach (var z in dev.Zones)
+            var zones = dev.Zones.Select(z => (Z: z, Kind: (RegionKind?)GuessRegion(dev, z), Order: (int)z.Id)).ToList();
+            // the x16 R2 chassis controller: known light ids fill in whatever the user has not identified
+            if (!simulated && x16r2 && dev.Vid == 0x187C && dev.Pid == 0x0551)
+            {
+                var known = dev.Zones.Select(z => z.Id).ToHashSet();
+                zones.AddRange(X16R2Chassis.Where(p => !known.Contains(p.Id))
+                    .Select(p => (Z: new LightZone { Id = p.Id, Name = p.Name, Flags = (ushort)(p.Kind == RegionKind.Other ? 1 : 0) }, Kind: (RegionKind?)p.Kind, p.Order)));
+            }
+
+            foreach (var (z, guess, guessOrder) in zones)
             {
                 var (kind, order) = s.LightRegions.TryGetValue(Key(dev, z.Id), out var a)
                     ? ParseAssignment(a)
-                    : (GuessRegion(dev, z), z.Id);
+                    : (guess, guessOrder);
                 switch (kind) // null = the user excluded this light
-
                 {
                     case RegionKind.Ring: ring.Add((dev, z, order)); break;
                     case RegionKind.Logo: logo.Add((dev, z)); break;
                     case RegionKind.Keyboard: kbZones.Add((dev, z, order)); break;
+                    case RegionKind.Touchpad: touchpad.Add((dev, z)); break;
                     case RegionKind.Other: other.Add((dev, z)); break;
                 }
             }
@@ -188,18 +229,22 @@ public sealed class SpatialLayout
             regions.Add(r);
         }
 
-        if (other.Count > 0)
-        {
-            var r = new LightRegion { Kind = RegionKind.Other };
-            for (int i = 0; i < other.Count; i++)
-            {
-                double along = (i + 0.5) / other.Count;
-                r.Points.Add(new LayoutPoint(other[i].Dev, other[i].Z.Id, RegionKind.Other,
-                    OtherFrame.X + OtherFrame.W * along, OtherFrame.Cy, 0.03, 0.045, along, other[i].Z.Name));
-            }
-            regions.Add(r);
-        }
+        AddRow(regions, RegionKind.Touchpad, TouchpadFrame, touchpad, 0.05, 0.08);
+        AddRow(regions, RegionKind.Other, OtherFrame, other, 0.03, 0.045);
         return new SpatialLayout(regions);
+    }
+
+    /// <summary>Lights spread evenly across a frame (touchpad, other lights).</summary>
+    private static void AddRow(List<LightRegion> regions, RegionKind kind, NRect f, List<(LightDevice Dev, LightZone Z)> lights, double w, double h)
+    {
+        if (lights.Count == 0) return;
+        var r = new LightRegion { Kind = kind };
+        for (int i = 0; i < lights.Count; i++)
+        {
+            double along = (i + 0.5) / lights.Count;
+            r.Points.Add(new LayoutPoint(lights[i].Dev, lights[i].Z.Id, kind, f.X + f.W * along, f.Cy, w, h, along, lights[i].Z.Name));
+        }
+        regions.Add(r);
     }
 
     /// <summary>Per-key points from the user's key map (or every key, in demo mode).</summary>
@@ -212,6 +257,21 @@ public sealed class SpatialLayout
             .ToList();
         if (mapped.Count == 0 && simulated)
             mapped = KeyboardLayout.Keys.Select((k, i) => ((ushort)i, k.Code)).ToList();
+
+        if (mapped.Count == 0 && dev.Api == LightApi.V5)
+        {
+            // no key map yet: per-key keyboards number their keys row by row, so a grid gives
+            // smooth per-key effects right away (key calibration makes positions exact)
+            var g = KeyboardFrame;
+            double cw = g.W / AutoKeysPerRow, rh = g.H / AutoKeyRows;
+            for (int id = 0; id < AutoKeysPerRow * AutoKeyRows; id++)
+            {
+                int row = id / AutoKeysPerRow, col = id % AutoKeysPerRow;
+                double x = g.X + (col + 0.5) * cw, y = g.Y + (row + 0.5) * rh;
+                region.Points.Add(new LayoutPoint(dev, (ushort)id, RegionKind.Keyboard, x, y, cw, rh, (col + 0.5) / AutoKeysPerRow, $"#{id}"));
+            }
+            return;
+        }
 
         foreach (var (id, code) in mapped)
         {

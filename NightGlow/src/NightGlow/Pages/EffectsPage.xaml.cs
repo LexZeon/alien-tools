@@ -244,7 +244,7 @@ public sealed partial class EffectsPage : Page, IRefreshable
         if (_fx is null) return;
         var fx = _fx;
         var p = Params();
-        var pal = p.GetPalette();
+        var pal = p.GetPalette(fx);
         double now = EffectClock.Now;
         var drops = fx.Interactive
             ? App.Lighting.Ripples.Frame(now, SpatialEffects.RippleLife(p.Speed), p.AutoRain, SpatialEffects.RainEvery(p.Speed))

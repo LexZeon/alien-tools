@@ -28,6 +28,9 @@ public sealed record EffectDefinition(
     /// <summary>Preset entries (such as the default blue) use this color instead of the user's colors.</summary>
     public Rgb? FixedColor { get; init; }
 
+    /// <summary>Effects with their own look (nebula, aurora) always use this palette.</summary>
+    public string? FixedPalette { get; init; }
+
     /// <summary>
     /// Chassis lights (API v4) run this as a per-light hardware action whose phase length
     /// (the action's "time" byte) can be set. Keyboards (API v5) have no such setting.
@@ -53,6 +56,9 @@ public sealed record EffectParameters(Rgb Color1, Rgb Color2, int Speed /* 1..10
     public int Duration { get; init; } = DefaultDuration; // 1..10
 
     public Palette GetPalette() => Palette.Resolve(PaletteId, Color1, Color2);
+
+    /// <summary>The palette an effect really uses (its own fixed palette, if it has one).</summary>
+    public Palette GetPalette(EffectDefinition fx) => Palette.Resolve(fx.FixedPalette ?? PaletteId, Color1, Color2);
 
     /// <summary>Hardware tempo byte for API v5 whole-device effects. Smaller = faster (to be verified on hardware).</summary>
     public byte KeyboardTempo => (byte)Math.Clamp(11 - Speed, 1, 10);
@@ -84,21 +90,33 @@ public static class EffectCatalog
             null, ColorMode.One, null, Rainbow, HasDirection: true, HasPalette: true),
         new("sp-ripple", "水滴涟漪", "点击预览图放出波纹，像水滴落入水面；也可以自动下雨（软件）", EffectKind.Software, "", 0, true,
             null, ColorMode.One, null, new[] { "#05070D", "#35D6E8", "#05070D", "#8B5CF6", "#05070D" }, HasPalette: true, Interactive: true),
+        new("sp-nebula", "星云", "紫蓝粉色的云团缓慢漂移，偶尔有星星闪烁（软件）", EffectKind.Software, "", 0, true,
+            null, ColorMode.One, null, new[] { "#1B0A66", "#6A1BFF", "#FF2FB4", "#00B7FF" }) { FixedPalette = "nebula" },
+        new("sp-aurora", "极光", "一道道光幕左右飘动（软件）", EffectKind.Software, "", 0, true,
+            null, ColorMode.One, null, new[] { "#021A12", "#00FFA3", "#00C8FF", "#6A5CFF" }) { FixedPalette = "aurora" },
+        new("sp-laser", "激光扫描", "一道光束带着拖影扫过选中区域，方向可选（软件）", EffectKind.Software, "", 0, true,
+            null, ColorMode.One, null, new[] { "#05070D", "#FF2A2A", "#FF8A8A", "#05070D" }, HasDirection: true, HasPalette: true),
+        new("sp-stars", "星空", "深蓝夜空，每颗灯随机闪烁（软件）", EffectKind.Software, "", 0, true,
+            null, ColorMode.One, null, new[] { "#020617", "#0B1A4A", "#C8D8FF", "#0B1A4A" }),
+        new("sp-fire", "火焰", "火苗从前沿往上窜（软件）", EffectKind.Software, "", 0, true,
+            null, ColorMode.One, null, new[] { "#000000", "#AA0A00", "#FF6E00", "#FFD228" }),
+        new("sp-plasma", "等离子", "流动的彩色等离子纹理（软件）", EffectKind.Software, "", 0, true,
+            null, ColorMode.One, null, Rainbow, HasPalette: true),
 
         new("static", "静态", "所有灯区保持同一个颜色", EffectKind.Hardware, "", 1, false,
             HardwareEffect.Static, ColorMode.One, LightActionType.Color, new[] { "#35D6E8", "#35D6E8" }),
         new("default-blue", "默认蓝", "一键恢复成蓝色静态灯光，不需要选颜色", EffectKind.Hardware, "", 0, false,
             HardwareEffect.Static, ColorMode.One, LightActionType.Color, new[] { "#0A5CFF", "#0A5CFF" })
             { FixedColor = DefaultBlue },
-        new("rainbow-wave", "硬件彩虹波", "键盘用固件彩虹波（方向由固件决定）；灯环每段错开相位形成流动。关掉 NightGlow 也保持", EffectKind.Hardware, "", 0, true,
+        new("rainbow-wave", "硬件彩虹波", "关掉 NightGlow 也保持。键盘用固件彩虹波（方向固定、较生硬）；灯环每段错开相位形成流动。要丝滑请用软件的彩虹波", EffectKind.Hardware, "", 0, true,
             HardwareEffect.SideWave, ColorMode.Spectrum, LightActionType.Morph, Rainbow, HasDirection: true, HasPalette: true),
         new("breathing", "呼吸", "颜色缓慢亮起再熄灭", EffectKind.Hardware, "", 1, true,
             HardwareEffect.Breathing, ColorMode.One, LightActionType.Breathing, new[] { "#101018", "#8B5CF6", "#101018" }),
         new("spectrum", "光谱循环", "所有灯区一起在全色谱中循环（硬件）", EffectKind.Hardware, "", 0, true,
             HardwareEffect.Rainbow, ColorMode.Spectrum, LightActionType.Rainbow, Rainbow),
-        new("side-wave", "单色波", "单一颜色的波浪", EffectKind.Hardware, "", 1, true,
+        new("side-wave", "单色波", "单一颜色的波浪（固件动画，较生硬；要丝滑请用软件的彩虹波 + 自定义配色）", EffectKind.Hardware, "", 1, true,
             HardwareEffect.SideWave, ColorMode.One, LightActionType.Pulse, new[] { "#101018", "#35D6E8", "#101018", "#35D6E8" }),
-        new("dual-wave", "双色波", "两种颜色交替的波浪", EffectKind.Hardware, "", 2, true,
+        new("dual-wave", "双色波", "两种颜色交替的波浪（固件动画，较生硬；要丝滑请用软件的彩虹波 + 自定义配色）", EffectKind.Hardware, "", 2, true,
             HardwareEffect.DualWave, ColorMode.Two, LightActionType.Morph, new[] { "#35D6E8", "#8B5CF6", "#35D6E8", "#8B5CF6" }),
         new("pulse", "脉冲", "颜色快速闪烁", EffectKind.Hardware, "", 1, true,
             HardwareEffect.Pulse, ColorMode.One, LightActionType.Pulse, new[] { "#FF4D6D", "#101018", "#FF4D6D", "#101018" }),
@@ -106,8 +124,6 @@ public static class EffectCatalog
             HardwareEffect.Morph, ColorMode.Two, LightActionType.Morph, new[] { "#FF7A18", "#AF002D" }),
         new("bounce", "弹跳", "光点来回弹跳（键盘）", EffectKind.Hardware, "", 1, true,
             HardwareEffect.Bounce, ColorMode.One, null, new[] { "#101018", "#3BFF6E", "#101018" }),
-        new("laser", "激光", "光束扫过键盘（键盘）", EffectKind.Hardware, "", 1, true,
-            HardwareEffect.Laser, ColorMode.One, null, new[] { "#101018", "#FF3B3B", "#101018" }),
 
         new("sw-cycle", "颜色循环", "所有选中区域一起平滑变换颜色（软件）", EffectKind.Software, "", 0, true,
             null, ColorMode.One, null, Rainbow, HasPalette: true),

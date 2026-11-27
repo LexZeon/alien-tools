@@ -112,6 +112,7 @@
                                 <StackPanel x:Name="IdChoices" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
                                     <Button Content="背部灯环" Tag="ring" Click="IdChoice_Click" Style="{StaticResource AccentButtonStyle}" />
                                     <Button Content="Logo" Tag="logo" Click="IdChoice_Click" />
+                                    <Button Content="触控板" Tag="touchpad" Click="IdChoice_Click" />
                                     <Button Content="其他灯" Tag="other" Click="IdChoice_Click" />
                                     <Button Content="没亮" Tag="skip" Click="IdChoice_Click" />
                                 </StackPanel>
@@ -156,6 +157,7 @@
                                             <ComboBoxItem Content="自动（按名称）" />
                                             <ComboBoxItem Content="背部灯环" />
                                             <ComboBoxItem Content="Logo" />
+                                            <ComboBoxItem Content="触控板" />
                                             <ComboBoxItem Content="其他灯光" />
                                             <ComboBoxItem Content="键盘" />
                                             <ComboBoxItem Content="不参与灯效" />
