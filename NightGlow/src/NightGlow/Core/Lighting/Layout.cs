@@ -80,15 +80,32 @@ public sealed class SpatialLayout
     };
 
     /// <summary>
-    /// Chassis lights of the Alienware x16 R2 confirmed on hardware: id 0 is on the rear ring,
-    /// id 62 is the touchpad corner light. The vendor app's own LED numbers do not match the
-    /// hardware ids (its "061" logo is in the 64..95 range), so nothing else is guessed;
-    /// the identification wizard places the rest. Used only for ids the user has not identified.
+    /// Chassis lights of the Alienware x16 R2, measured with four photographed patterns (every
+    /// id shown as base-4 digits in red/green/blue/white):
+    ///  - rear ring: one LED strip, ids 0..59. Seen from behind it starts on the upper edge about
+    ///    43% from the left and runs clockwise; on NightGlow's top view (mirrored) that is
+    ///    counter-clockwise from 57% along the upper edge;
+    ///  - lid logo: 61; touchpad: 62..69 from left to right;
+    ///  - 60 sits by the power button and is never driven (writing it made the button flicker).
+    /// Used for every id the user has not assigned themselves.
     /// </summary>
-    private static readonly (ushort Id, RegionKind Kind, int Order, string Name)[] X16R2Chassis =
+    private const int X16R2RingCount = 60;
+    private const double X16R2RingStart = 0.57;   // fraction of the ring width, upper edge, top view
+
+    private static IEnumerable<(ushort Id, RegionKind Kind, int Order, double? Exact, string Name)> X16R2Chassis()
     {
-        (0, RegionKind.Ring, 0, "灯环 0"), (62, RegionKind.Touchpad, 0, "触控板"),
-    };
+        // position of the strip start on the stadium path (same geometry as StadiumPoint)
+        var f = RingFrame;
+        double w = f.W * Aspect, r = f.H / 2, l = Math.Max(0, w - f.H), p = 2 * l + 2 * Math.PI * r;
+        double s0 = Math.Clamp(X16R2RingStart * w - r, 0, l) / p;
+        for (int i = 0; i < X16R2RingCount; i++)
+        {
+            double along = s0 - (double)i / X16R2RingCount;
+            yield return ((ushort)i, RegionKind.Ring, i, along - Math.Floor(along), $"灯环 {i}");
+        }
+        yield return (61, RegionKind.Logo, 0, null, "外星人头");
+        for (int i = 0; i < 8; i++) yield return ((ushort)(62 + i), RegionKind.Touchpad, i, null, $"触控板 {i + 1}");
+    }
 
     /// <summary>Fallback grid for unknown per-key keyboards (API v5): ids row by row.</summary>
     public const int AutoKeysPerRow = 16, AutoKeyRows = 6;
@@ -192,22 +209,27 @@ public sealed class SpatialLayout
 
         foreach (var dev in devices.Where(d => d.Present))
         {
-            var zones = dev.Zones.Select(z => (Z: z, Kind: (RegionKind?)GuessRegion(dev, z), Order: (int)z.Id)).ToList();
-            // the x16 R2 chassis controller: known light ids fill in whatever the user has not identified
+            var zones = dev.Zones.Select(z => (Z: z, Kind: (RegionKind?)GuessRegion(dev, z), Order: (int)z.Id, Exact: (double?)null)).ToList();
+            // the x16 R2 chassis controller: measured positions for every light the user has not assigned
             if (!simulated && x16r2 && dev.Vid == 0x187C && dev.Pid == 0x0551)
             {
+                var preset = X16R2Chassis().ToDictionary(p => p.Id);
+                for (int i = 0; i < zones.Count; i++)
+                    if (preset.TryGetValue(zones[i].Z.Id, out var pz) && !s.LightRegions.ContainsKey(Key(dev, zones[i].Z.Id)))
+                        zones[i] = (zones[i].Z, pz.Kind, pz.Order, pz.Exact);
                 var known = dev.Zones.Select(z => z.Id).ToHashSet();
-                zones.AddRange(X16R2Chassis.Where(p => !known.Contains(p.Id))
-                    .Select(p => (Z: new LightZone { Id = p.Id, Name = p.Name, Flags = (ushort)(p.Kind == RegionKind.Other ? 1 : 0) }, Kind: (RegionKind?)p.Kind, p.Order)));
+                zones.AddRange(preset.Values.Where(p => !known.Contains(p.Id))
+                    .Select(p => (Z: new LightZone { Id = p.Id, Name = p.Name }, Kind: (RegionKind?)p.Kind, p.Order, p.Exact)));
             }
 
-            foreach (var (z, guess, guessOrder) in zones)
+            foreach (var (z, guess, guessOrder, guessExact) in zones.OrderBy(x => x.Z.Id))
             {
                 s.LightRegions.TryGetValue(Key(dev, z.Id), out var a);
                 var (kind, order) = a is not null ? ParseAssignment(a) : (guess, guessOrder);
+                var exact = a is not null ? ExactAlong(a) : guessExact;
                 switch (kind) // null = the user excluded this light
                 {
-                    case RegionKind.Ring: ring.Add((dev, z, order, ExactAlong(a))); break;
+                    case RegionKind.Ring: ring.Add((dev, z, order, exact)); break;
                     case RegionKind.Logo: logo.Add((dev, z)); break;
                     case RegionKind.Keyboard: kbZones.Add((dev, z, order)); break;
                     case RegionKind.Touchpad: touchpad.Add((dev, z)); break;
