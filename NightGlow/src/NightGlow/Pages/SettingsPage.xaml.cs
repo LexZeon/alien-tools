@@ -25,7 +25,7 @@ public sealed partial class SettingsPage : Page
         _loading = false;
 
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
-        VersionText.Text = $"版本 {ver?.ToString(3) ?? "0.1.0"}（预览版）";
+        VersionText.Text = $"版本 {ver?.ToString(3) ?? "0.1.1"}（预览版）";
         CoreText.Text = "核心库：" + App.Lighting.CoreStatus;
         AdminText.Text = SystemInfo.IsElevated ? "权限：管理员（风扇、温度、性能模式可用）" : "权限：普通用户（灯光可用；风扇、温度、性能模式需要管理员）";
         var vendor = SystemInfo.VendorControlProcesses();

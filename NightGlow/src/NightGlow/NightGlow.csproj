@@ -21,7 +21,7 @@
     <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\NightGlow.ico</ApplicationIcon>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Product>NightGlow</Product>
     <Description>Lighting, fan and power control for Alienware laptops (unofficial)</Description>
     <Copyright>Copyright (c) 2026 NightGlow contributors. MIT License.</Copyright>
