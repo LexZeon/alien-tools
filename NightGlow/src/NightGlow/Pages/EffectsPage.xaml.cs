@@ -373,7 +373,8 @@ public sealed partial class EffectsPage : Page, IRefreshable
         _demoTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _demoTimer.Tick += DemoTick;
         DemoButtonText.Text = "停止演示";
-        DemoCaptionBox.Visibility = Visibility.Visible;
+        // "--nocaption" records clean footage (used for the README animations)
+        DemoCaptionBox.Visibility = Environment.GetCommandLineArgs().Contains("--nocaption") ? Visibility.Collapsed : Visibility.Visible;
         NextDemoStep();
         _demoTimer.Start();
     }

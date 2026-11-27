@@ -8,7 +8,7 @@ NightGlow 本身以 MIT 许可证发布（见同目录的 `LICENSE`）。下面�
 | 组件 | 用在哪里 | 许可证 | 来源 |
 |---|---|---|---|
 | alien-tools（AlienRGB_SDK、alienfan-SDK_v2） | `nightglow_core.dll`：灯光 HID 协议、BIOS 风扇/电源接口 | MIT，Copyright (c) 2020 Rik Lain（见仓库根目录 `LICENSE`） | https://github.com/T-Troll/alien-tools |
-| Gurjot95 AlienFX-SDK | alien-tools 说明它的底层灯光 SDK 基于这个项目 | **未确认**：该仓库没有许可证文件（2026-11-27 查询 GitHub API 返回无许可证）。alien-tools 整体以 MIT 发布。如果要正式发布，建议先向原作者确认。 | https://github.com/Gurjot95/AlienFX-SDK |
+| Gurjot95 AlienFX-SDK | alien-tools 说明它的底层灯光 SDK 基于这个项目 | **未声明许可证**：上游 SDK 的低层部分源自 Gurjot95/AlienFX-SDK，该仓库没有许可证文件（2026-11-27 查询 GitHub API 返回无许可证）。NightGlow 通过 alien-tools（MIT）使用这部分代码；如原作者有异议，会移除相关代码。 | https://github.com/Gurjot95/AlienFX-SDK |
 
 ## 随程序分发的运行库（自包含发布时）
 
