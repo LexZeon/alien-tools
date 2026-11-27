@@ -1,3 +1,21 @@
+<div align="center">
+
+# 🌙 NightGlow
+
+<b>Open-source lighting for Alienware laptops. Every zone, every key, one rhythm.</b><br>
+<b>给 Alienware 笔记本的开源灯光软件。每个区域、每个键，同一个节奏。</b>
+
+<a href="NightGlow/README.md"><img src="NightGlow/docs/media/hero.gif" alt="NightGlow: a rainbow wave across the keyboard, rear ring, logo and touchpad" width="100%"></a>
+
+<a href="NightGlow/README.md"><b>✨ NightGlow README</b></a> · <a href="NightGlow/README.md#zh"><b>📖 中文</b></a>
+
+</div>
+
+This fork adds NightGlow, a new lighting app; the original Alien Tools README by T-Troll follows below.<br>
+本 fork 新增 NightGlow；下面是 T-Troll 原版 Alien Tools 的说明。
+
+---
+
 # Alien Tools
 
 AWCC is not needed anymore - here are light weighted tools for Alienware systems lights, fans, power profile control:
