@@ -71,9 +71,9 @@ Also included: ✨ starfield, and the keyboard's built-in effects (static, breat
 
 ### 🚀 Download and run
 
-1. Download `NightGlow-v0.1.0-preview.zip` from [Releases](../../releases) and check its SHA256 against the release notes.
-2. Extract it to a short path, such as `C:\NightGlow`.
-3. Run `NightGlow.exe`. Lighting works without administrator rights. Performance presets ask for them.
+1. From [Releases](../../releases), download either the single-file `NightGlow-v0.1.0-preview.exe` (just run it; the first start unpacks itself) or `NightGlow-v0.1.0-preview.zip`, and check its SHA256 against the release notes.
+2. For the zip: extract it to a short path, such as `C:\NightGlow`, then run `NightGlow.exe`.
+3. Lighting works without administrator rights. Performance presets ask for them. The exe is not code-signed, so SmartScreen may ask you to confirm (More info → Run anyway).
 
 AWCC can keep running alongside NightGlow, but it may overwrite your lights. NightGlow only warns you; it never closes or uninstalls AWCC.
 
@@ -155,9 +155,9 @@ NightGlow 是给 Alienware 笔记本用的灯光软件，基于开源的 [alien-
 
 ### 🚀 下载和运行
 
-1. 从 [Releases](../../releases) 下载 `NightGlow-v0.1.0-preview.zip`，并对照发布说明核对 SHA256。
-2. 解压到短路径，比如 `C:\NightGlow`。
-3. 运行 `NightGlow.exe`。灯光功能不需要管理员权限；切换性能预设时会请求。
+1. 从 [Releases](../../releases) 下载单文件 `NightGlow-v0.1.0-preview.exe`（直接运行，第一次启动会先自解压），或者 `NightGlow-v0.1.0-preview.zip`，并对照发布说明核对 SHA256。
+2. 如果下的是 zip：解压到短路径（比如 `C:\NightGlow`），再运行 `NightGlow.exe`。
+3. 灯光功能不需要管理员权限；切换性能预设时会请求。exe 没有代码签名，SmartScreen 可能会要你确认（更多信息 → 仍要运行）。
 
 AWCC 可以和 NightGlow 同时运行，但它可能把你的灯光改回去。NightGlow 只会提示，不会关闭或卸载 AWCC。
 
