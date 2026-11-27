@@ -4,6 +4,9 @@ using NightGlow.Core.Interop;
 
 namespace NightGlow.Core.Lighting;
 
+/// <summary>System-wide lighting state on top of the current effect: normal, dimmed or all off.</summary>
+public enum LightingMode { Normal = 0, Dim = 1, Off = 2 }
+
 /// <summary>
 /// App-level lighting facade. All hardware calls are serialized on one exclusive scheduler,
 /// so the UI thread never blocks on HID writes and calls never interleave.
@@ -20,6 +23,10 @@ public sealed partial class LightingService : ObservableObject, IDisposable
     public ObservableCollection<LightDevice> Devices { get; } = new();
 
     [ObservableProperty] private string _activeEffectName = "未设置";
+    [ObservableProperty] private LightingMode _mode = LightingMode.Normal;
+
+    /// <summary>Dim mode keeps this share of each device's normal brightness.</summary>
+    public const int DimPercent = 30;
 
     /// <summary>Last hardware error (set on the hardware thread, so not observable).</summary>
     public string? LastError { get; private set; }
@@ -74,11 +81,19 @@ public sealed partial class LightingService : ObservableObject, IDisposable
         await Run(b => b.SetBrightness(dev.Index, brightness, false));
     }
 
+    /// <summary>
+    /// Applies an effect. Applying also returns the lighting mode to normal. Brightness: hardware
+    /// effects set the device brightness to <see cref="EffectParameters.Brightness"/>; software
+    /// effects already scale their colors by it, so the device itself is set to full brightness.
+    /// </summary>
     public async Task ApplyEffectAsync(EffectDefinition fx, EffectParameters p, IReadOnlyList<LightDevice> targets)
     {
         _engine.Stop();
+        p = p.For(fx);
+        Mode = LightingMode.Normal;
         if (fx.Kind == EffectKind.Software)
         {
+            await Run(b => { foreach (var dev in targets) SetDeviceBrightness(b, dev, 255); });
             _engine.Start(fx, p, targets);
             ActiveEffectName = fx.Name;
             return;
@@ -92,10 +107,41 @@ public sealed partial class LightingService : ObservableObject, IDisposable
                     ApplyStatic(b, dev, Rgb.Black);
                     continue;
                 }
+                SetDeviceBrightness(b, dev, p.Brightness);
                 ApplyHardware(b, dev, fx, p);
             }
         });
         ActiveEffectName = fx.Name;
+    }
+
+    private static void SetDeviceBrightness(ILightingBackend b, LightDevice dev, byte value)
+    {
+        dev.Brightness = value;
+        b.SetBrightness(dev.Index, value, false);
+    }
+
+    /// <summary>
+    /// Dims or turns off every light without touching the running effect. Each device's normal
+    /// brightness is kept, so switching back to <see cref="LightingMode.Normal"/> restores it.
+    /// The power button light is left alone.
+    /// </summary>
+    public async Task SetModeAsync(LightingMode mode)
+    {
+        Mode = mode;
+        var devices = Devices.ToList();
+        await Run(b =>
+        {
+            foreach (var dev in devices)
+            {
+                byte level = mode switch
+                {
+                    LightingMode.Off => (byte)0,
+                    LightingMode.Dim => (byte)Math.Max(8, dev.Brightness * DimPercent / 100),
+                    _ => dev.Brightness,
+                };
+                b.SetBrightness(dev.Index, level, false);
+            }
+        });
     }
 
     public void StopSoftwareEffect() => _engine.Stop();
@@ -124,8 +170,8 @@ public sealed partial class LightingService : ObservableObject, IDisposable
             var actions = za switch
             {
                 LightActionType.Color => new[] { new LightAction(za, 0, 0, p.Color1) },
-                LightActionType.Morph => new[] { new LightAction(za, 7, p.ZoneTempo, p.Color1), new LightAction(za, 7, p.ZoneTempo, p.Color2) },
-                _ => new[] { new LightAction(za, 7, p.ZoneTempo, p.Color1) },
+                LightActionType.Morph => new[] { new LightAction(za, p.ZoneTime, p.ZoneTempo, p.Color1), new LightAction(za, p.ZoneTime, p.ZoneTempo, p.Color2) },
+                _ => new[] { new LightAction(za, p.ZoneTime, p.ZoneTempo, p.Color1) },
             };
             b.SetAction(dev.Index, zone.Id, actions);
         }
@@ -136,7 +182,7 @@ public sealed partial class LightingService : ObservableObject, IDisposable
     public static bool Supports(LightDevice dev, EffectDefinition fx) => fx.Kind switch
     {
         EffectKind.Off => true,
-        EffectKind.Software => fx.Id != "sw-wave" ? (dev.Zones.Count > 0 || dev.HasHardwareEffects) : dev.Zones.Count > 1,
+        EffectKind.Software => fx.NeedsLightOrder ? dev.Zones.Count > 1 : (dev.Zones.Count > 0 || dev.HasHardwareEffects),
         _ => (dev.HasHardwareEffects && fx.KeyboardEffect is not null) || (fx.ZoneAction is not null && dev.Zones.Count > 0),
     };
 

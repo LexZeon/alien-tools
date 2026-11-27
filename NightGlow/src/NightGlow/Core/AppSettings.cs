@@ -11,6 +11,8 @@ public sealed class AppSettings
     public string Color2 { get; set; } = "#8B5CF6";
     public int Speed { get; set; } = 5;
     public int Brightness { get; set; } = 255;
+    public int Duration { get; set; } = 4;               // 1..10, chassis per-light action length
+    public bool Reverse { get; set; }                     // software waves run last light -> first light
     public Dictionary<string, string> ZoneColors { get; set; } = new(); // "VID:PID/id" -> #RRGGBB
 
     private static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NightGlow");

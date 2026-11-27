@@ -84,8 +84,15 @@
                                 <Slider x:Name="SpeedSlider" Minimum="1" Maximum="10" StepFrequency="1" TickFrequency="1"
                                         TickPlacement="BottomRight" ValueChanged="Param_Changed" />
                             </StackPanel>
+                            <StackPanel x:Name="DurationRow">
+                                <TextBlock Text="时长（机身灯每段动作的长度）" Style="{StaticResource NgMuted}" />
+                                <Slider x:Name="DurationSlider" Minimum="1" Maximum="10" StepFrequency="1" TickFrequency="1"
+                                        TickPlacement="BottomRight" ValueChanged="Param_Changed" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="ReverseSwitch" Header="方向" OffContent="从第一个灯区流向最后一个"
+                                          OnContent="从最后一个灯区流向第一个" Toggled="ReverseSwitch_Toggled" />
                             <StackPanel>
-                                <TextBlock Text="亮度（软件灯效和预览）" Style="{StaticResource NgMuted}" />
+                                <TextBlock Text="亮度" Style="{StaticResource NgMuted}" />
                                 <Slider x:Name="BrightSlider" Minimum="10" Maximum="100" StepFrequency="5" ValueChanged="Param_Changed" />
                             </StackPanel>
 
@@ -115,6 +122,19 @@
                             </StackPanel>
                             <TextBlock x:Name="ApplyStatus" Style="{StaticResource NgMuted}" FontSize="12" />
                         </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource NgCard}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="照明模式" Style="{StaticResource NgSectionTitle}" Margin="0" />
+                        <TextBlock Text="一键调暗或关闭所有灯光，当前灯效保持不变；切回“正常”即恢复。" Style="{StaticResource NgMuted}"
+                                   FontSize="12" TextWrapping="Wrap" />
+                        <RadioButtons x:Name="ModeButtons" MaxColumns="3" SelectionChanged="ModeButtons_SelectionChanged">
+                            <x:String>正常</x:String>
+                            <x:String>调暗</x:String>
+                            <x:String>关闭</x:String>
+                        </RadioButtons>
                     </StackPanel>
                 </Border>
             </StackPanel>

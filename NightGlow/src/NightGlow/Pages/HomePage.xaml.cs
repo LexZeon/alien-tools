@@ -57,7 +57,7 @@ public sealed partial class HomePage : Page, IRefreshable
     private EffectParameters CurrentParams() => new(
         Rgb.TryParse(App.Settings.Color1, out var c1) ? c1 : Rgb.White,
         Rgb.TryParse(App.Settings.Color2, out var c2) ? c2 : Rgb.White,
-        App.Settings.Speed, (byte)App.Settings.Brightness);
+        App.Settings.Speed, (byte)App.Settings.Brightness, App.Settings.Duration, App.Settings.Reverse);
 
     private async void QuickRainbow_Click(object sender, RoutedEventArgs e) =>
         await App.Lighting.ApplyEffectAsync(EffectCatalog.Find("rainbow-wave")!, CurrentParams(), App.Lighting.Devices.ToList());

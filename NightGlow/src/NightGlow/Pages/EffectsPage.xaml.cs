@@ -62,6 +62,9 @@ public sealed partial class EffectsPage : Page, IRefreshable
         _c2 = Rgb.TryParse(s.Color2, out var c2) ? c2 : new Rgb(0x8B, 0x5C, 0xF6);
         SpeedSlider.Value = Math.Clamp(s.Speed, 1, 10);
         BrightSlider.Value = Math.Clamp(Math.Round(s.Brightness / 2.55), 10, 100);
+        DurationSlider.Value = Math.Clamp(s.Duration, 1, 10);
+        ReverseSwitch.IsOn = s.Reverse;
+        ModeButtons.SelectedIndex = (int)App.Lighting.Mode;
         UpdateSwatches();
         _loading = false;
 
@@ -82,7 +85,8 @@ public sealed partial class EffectsPage : Page, IRefreshable
     }
 
     private EffectParameters Params() =>
-        new(_c1, _c2, (int)SpeedSlider.Value, (byte)Math.Round(BrightSlider.Value * 2.55));
+        new(_c1, _c2, (int)SpeedSlider.Value, (byte)Math.Round(BrightSlider.Value * 2.55),
+            (int)DurationSlider.Value, ReverseSwitch.IsOn);
 
     private void EffectGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -93,6 +97,8 @@ public sealed partial class EffectsPage : Page, IRefreshable
         ColorRow.Visibility = _fx.ColorCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         Color2Button.Visibility = _fx.ColorCount > 1 ? Visibility.Visible : Visibility.Collapsed;
         SpeedRow.Visibility = _fx.HasSpeed ? Visibility.Visible : Visibility.Collapsed;
+        DurationRow.Visibility = _fx.HasDuration ? Visibility.Visible : Visibility.Collapsed;
+        ReverseSwitch.Visibility = _fx.HasDirection ? Visibility.Visible : Visibility.Collapsed;
         UpdateTargets();
     }
 
@@ -114,6 +120,30 @@ public sealed partial class EffectsPage : Page, IRefreshable
         if (_loading) return;
         App.Settings.Speed = (int)SpeedSlider.Value;
         App.Settings.Brightness = (int)Math.Round(BrightSlider.Value * 2.55);
+        App.Settings.Duration = (int)DurationSlider.Value;
+    }
+
+    private void ReverseSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        App.Settings.Reverse = ReverseSwitch.IsOn;
+    }
+
+    private async void ModeButtons_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // RadioButtons raises SelectionChanged late (after layout), so compare with the current
+        // mode instead of relying on the _loading flag alone.
+        if (_loading || ModeButtons.SelectedIndex < 0) return;
+        var mode = (LightingMode)ModeButtons.SelectedIndex;
+        if (mode == App.Lighting.Mode) return;
+        await App.Lighting.SetModeAsync(mode);
+        string what = mode switch
+        {
+            LightingMode.Dim => $"已调暗到正常亮度的 {LightingService.DimPercent}%",
+            LightingMode.Off => "已关闭所有灯光",
+            _ => "已恢复正常亮度",
+        };
+        ApplyStatus.Text = what + (App.Lighting.IsSimulated ? "（演示模式，没有发送到硬件）。" : "。");
     }
 
     private void RenderPreview()
@@ -162,6 +192,9 @@ public sealed partial class EffectsPage : Page, IRefreshable
             await App.Lighting.ApplyEffectAsync(_fx, Params(), targets);
             App.Settings.EffectId = _fx.Id;
             App.Settings.Save();
+            _loading = true;
+            ModeButtons.SelectedIndex = (int)App.Lighting.Mode; // applying returns to normal mode
+            _loading = false;
             ApplyStatus.Text = App.Lighting.IsSimulated
                 ? $"已在演示模式下应用“{_fx.Name}”（没有发送到硬件）。"
                 : $"已应用“{_fx.Name}”到 {targets.Count} 个设备。";

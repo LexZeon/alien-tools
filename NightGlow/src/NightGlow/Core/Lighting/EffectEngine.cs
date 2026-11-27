@@ -96,9 +96,25 @@ internal sealed class EffectEngine
                 return Rgb.Lerp(p.Color1, p.Color2, k).Scale(bright);
             }
             case "sw-wave":
-                return Rgb.FromHsv(t * 360 + (n > 1 ? 360.0 * i / n : 0), 1, bright);
+                return Rgb.FromHsv((t - Position(p, i, n)) * 360, 1, bright);
+            case "sw-color-wave":
+            {
+                double k = (1 + Math.Sin((t - Position(p, i, n)) * 2 * Math.PI)) / 2;
+                return Rgb.Lerp(p.Color1, p.Color2, k).Scale(bright);
+            }
             default:
                 return p.Color1.Scale(bright);
         }
+    }
+
+    /// <summary>
+    /// Where light <paramref name="i"/> sits along the flow, 0..1. Waves move towards higher
+    /// positions, so by default they run from the first light to the last; Reverse flips that.
+    /// </summary>
+    private static double Position(EffectParameters p, int i, int n)
+    {
+        if (n <= 1) return 0;
+        int k = p.Reverse ? n - 1 - i : i;
+        return (double)k / n;
     }
 }

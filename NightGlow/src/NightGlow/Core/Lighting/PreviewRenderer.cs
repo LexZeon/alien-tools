@@ -9,6 +9,7 @@ public static class PreviewRenderer
 {
     public static Rgb ColorAt(EffectDefinition fx, EffectParameters p, double seconds, int i, int n)
     {
+        p = p.For(fx);
         double period = 12.0 / Math.Clamp(p.Speed, 1, 10);
         double t = seconds / period;
         double x = n > 1 ? (double)i / (n - 1) : 0;
@@ -18,6 +19,7 @@ public static class PreviewRenderer
         switch (fx.Id)
         {
             case "static":
+            case "default-blue":
                 return p.Color1.Scale(bright);
             case "off":
                 return dark;
