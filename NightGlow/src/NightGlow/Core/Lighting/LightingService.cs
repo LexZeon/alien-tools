@@ -15,12 +15,21 @@ public sealed partial class LightingService : ObservableObject, IDisposable
 {
     private readonly TaskFactory _hw;
     private readonly EffectEngine _engine;
+    private readonly AppSettings _settings;
 
     public ILightingBackend Backend { get; }
     public bool IsSimulated => Backend.IsSimulated;
     public string CoreStatus { get; }
 
     public ObservableCollection<LightDevice> Devices { get; } = new();
+
+    /// <summary>Every light placed on the shared canvas, grouped into selectable regions.</summary>
+    public SpatialLayout Layout { get; private set; } = SpatialLayout.Empty;
+
+    /// <summary>Water-drop ripples shared by the engine and the preview.</summary>
+    public RippleField Ripples { get; } = new();
+
+    public event EventHandler? LayoutChanged;
 
     [ObservableProperty] private string _activeEffectName = "未设置";
     [ObservableProperty] private LightingMode _mode = LightingMode.Normal;
@@ -31,8 +40,11 @@ public sealed partial class LightingService : ObservableObject, IDisposable
     /// <summary>Last hardware error (set on the hardware thread, so not observable).</summary>
     public string? LastError { get; private set; }
 
-    public LightingService()
+    public bool IsSoftwareEffectRunning => _engine.IsRunning;
+
+    public LightingService(AppSettings settings)
     {
+        _settings = settings;
         _hw = new TaskFactory(new ConcurrentExclusiveSchedulerPair().ExclusiveScheduler);
         if (NativeMethods.TryProbe(out var reason))
         {
@@ -60,6 +72,14 @@ public sealed partial class LightingService : ObservableObject, IDisposable
         var list = await Run(b => b.Open());
         Devices.Clear();
         foreach (var d in list) Devices.Add(d);
+        RebuildLayout();
+    }
+
+    /// <summary>Call after zone names, region assignments or the key map changed.</summary>
+    public void RebuildLayout()
+    {
+        Layout = SpatialLayout.Build(Devices, _settings, IsSimulated);
+        LayoutChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public async Task SetZoneColorAsync(LightDevice dev, LightZone zone, Rgb color)
@@ -81,34 +101,41 @@ public sealed partial class LightingService : ObservableObject, IDisposable
         await Run(b => b.SetBrightness(dev.Index, brightness, false));
     }
 
+    /// <summary>Applies an effect to whole devices (used by the quick actions on the home page).</summary>
+    public Task ApplyEffectAsync(EffectDefinition fx, EffectParameters p, IReadOnlyList<LightDevice> devices)
+    {
+        var set = devices.Select(d => d.Index).ToHashSet();
+        return ApplyEffectAsync(fx, p, Layout.Points.Where(pt => set.Contains(pt.Device.Index)).ToList());
+    }
+
     /// <summary>
-    /// Applies an effect. Applying also returns the lighting mode to normal. Brightness: hardware
-    /// effects set the device brightness to <see cref="EffectParameters.Brightness"/>; software
-    /// effects already scale their colors by it, so the device itself is set to full brightness.
+    /// Applies an effect to the given lights (usually the points of the selected regions).
+    /// Applying also returns the lighting mode to normal. Brightness: hardware effects set the
+    /// device brightness to <see cref="EffectParameters.Brightness"/>; software effects already
+    /// scale their colors by it, so the device itself is set to full brightness.
     /// </summary>
-    public async Task ApplyEffectAsync(EffectDefinition fx, EffectParameters p, IReadOnlyList<LightDevice> targets)
+    public async Task ApplyEffectAsync(EffectDefinition fx, EffectParameters p, IReadOnlyList<LayoutPoint> points)
     {
         _engine.Stop();
         p = p.For(fx);
         Mode = LightingMode.Normal;
+        var devices = points.Select(pt => pt.Device).DistinctBy(d => d.Index).ToList();
         if (fx.Kind == EffectKind.Software)
         {
-            await Run(b => { foreach (var dev in targets) SetDeviceBrightness(b, dev, 255); });
-            _engine.Start(fx, p, targets);
+            await Run(b => { foreach (var dev in devices) SetDeviceBrightness(b, dev, 255); });
+            _engine.Start(fx, p, points);
             ActiveEffectName = fx.Name;
             return;
         }
         await Run(b =>
         {
-            foreach (var dev in targets)
+            foreach (var group in points.GroupBy(pt => pt.Device.Index))
             {
-                if (fx.Kind == EffectKind.Off)
-                {
-                    ApplyStatic(b, dev, Rgb.Black);
-                    continue;
-                }
+                var dev = group.First().Device;
+                var lights = group.ToList();
+                if (fx.Kind == EffectKind.Off) { ApplyColor(b, dev, lights, Rgb.Black); continue; }
                 SetDeviceBrightness(b, dev, p.Brightness);
-                ApplyHardware(b, dev, fx, p);
+                ApplyHardware(b, dev, lights, fx, p);
             }
         });
         ActiveEffectName = fx.Name;
@@ -155,41 +182,70 @@ public sealed partial class LightingService : ObservableObject, IDisposable
             b.SetHardwareEffect(dev.Index, HardwareEffect.Static, 5, ColorMode.One, color, color);
     }
 
-    private static void ApplyHardware(ILightingBackend b, LightDevice dev, EffectDefinition fx, EffectParameters p)
+    private static void ApplyColor(ILightingBackend b, LightDevice dev, List<LayoutPoint> lights, Rgb color)
+    {
+        if (lights.Any(l => l.IsWholeDevice))
+            b.SetHardwareEffect(dev.Index, HardwareEffect.Static, 5, ColorMode.One, color, color);
+        var single = lights.Where(l => !l.IsWholeDevice).Select(l => (l.LightId, color)).ToList();
+        if (single.Count > 0) b.SetColors(dev.Index, single);
+    }
+
+    /// <summary>Morph steps in a hardware wave chain. More steps = smoother colors, longer HID writes.</summary>
+    private const int WaveSteps = 12;
+
+    private static void ApplyHardware(ILightingBackend b, LightDevice dev, List<LayoutPoint> lights, EffectDefinition fx, EffectParameters p)
     {
         if (dev.HasHardwareEffects && fx.KeyboardEffect is { } ke)
         {
+            // whole-device effect: the controller animates every key itself
             b.SetHardwareEffect(dev.Index, ke, p.KeyboardTempo, fx.KeyboardColorMode, p.Color1, p.Color2);
             return;
         }
-        if (fx.ZoneAction is not { } za || dev.Zones.Count == 0)
-            return; // effect not available on this device
+        if (fx.ZoneAction is not { } za) return; // effect not available on this device
+        var zones = lights.Where(l => !l.IsWholeDevice).ToList();
+        if (zones.Count == 0) return;
 
-        foreach (var zone in dev.Zones)
+        var pal = p.GetPalette();
+        foreach (var pt in zones)
         {
-            var actions = za switch
+            LightAction[] actions;
+            if (fx.Id == "rainbow-wave")
+            {
+                // every light runs the same morph chain, started at a different phase:
+                // the controller then shows a wave that keeps running without NightGlow
+                double offset = SpatialEffects.Project(pt, p.Direction);
+                actions = Enumerable.Range(0, WaveSteps)
+                    .Select(j => new LightAction(LightActionType.Morph, p.ZoneTime, p.ZoneTempo, pal.Sample((double)j / WaveSteps - offset)))
+                    .ToArray();
+            }
+            else actions = za switch
             {
                 LightActionType.Color => new[] { new LightAction(za, 0, 0, p.Color1) },
                 LightActionType.Morph => new[] { new LightAction(za, p.ZoneTime, p.ZoneTempo, p.Color1), new LightAction(za, p.ZoneTime, p.ZoneTempo, p.Color2) },
                 _ => new[] { new LightAction(za, p.ZoneTime, p.ZoneTempo, p.Color1) },
             };
-            b.SetAction(dev.Index, zone.Id, actions);
+            b.SetAction(dev.Index, pt.LightId, actions);
         }
         b.Update(dev.Index);
     }
 
-    /// <summary>Which devices can show this effect at all (for the UI).</summary>
-    public static bool Supports(LightDevice dev, EffectDefinition fx) => fx.Kind switch
+    /// <summary>Whether an effect can show on a region at all, and how (for the UI).</summary>
+    public static (bool Ok, string Note) Supports(LightRegion region, EffectDefinition fx)
     {
-        EffectKind.Off => true,
-        EffectKind.Software => fx.NeedsLightOrder ? dev.Zones.Count > 1 : (dev.Zones.Count > 0 || dev.HasHardwareEffects),
-        _ => (dev.HasHardwareEffects && fx.KeyboardEffect is not null) || (fx.ZoneAction is not null && dev.Zones.Count > 0),
-    };
+        if (fx.Kind == EffectKind.Off) return (true, "");
+        if (fx.Kind == EffectKind.Software)
+            return (true, region.IsWholeDevice ? "整块同色（还没标定键位）" : "NightGlow 实时计算");
+        bool any = region.Points.Any(pt =>
+            (pt.Device.HasHardwareEffects && fx.KeyboardEffect is not null) || (fx.ZoneAction is not null && !pt.IsWholeDevice));
+        if (!any) return (false, "这个区域不支持此硬件灯效");
+        return (true, region.Points.Any(pt => pt.Device.HasHardwareEffects) && fx.KeyboardEffect is not null ? "由键盘固件运行" : "写入灯光控制器");
+    }
 
     public async Task RenameZoneAsync(LightDevice dev, LightZone zone, string name)
     {
         zone.Name = name;
         await Run(b => b.SetLightName(dev.Index, zone.Id, name, zone.Flags));
+        RebuildLayout();
     }
 
     public async Task<LightZone> AddZoneAsync(LightDevice dev, ushort id, string name)
@@ -197,13 +253,24 @@ public sealed partial class LightingService : ObservableObject, IDisposable
         var zone = new LightZone { Id = id, Name = name };
         dev.Zones.Add(zone);
         await Run(b => b.SetLightName(dev.Index, id, name, 0));
+        RebuildLayout();
         return zone;
     }
 
-    /// <summary>Lights a single light id (others off) so the user can find out which physical light it is.</summary>
+    /// <summary>Lights a single light id (others unchanged) so the user can find out which physical light it is.</summary>
     public Task ProbeLightAsync(LightDevice dev, ushort id, Rgb color) => Run(b =>
     {
         _engine.Stop();
+        b.SetColor(dev.Index, id, color);
+        b.Update(dev.Index);
+    });
+
+    /// <summary>Turns the whole device dark, then lights one id: used by key calibration.</summary>
+    public Task ProbeOnlyAsync(LightDevice dev, ushort id, Rgb color) => Run(b =>
+    {
+        _engine.Stop();
+        if (dev.HasHardwareEffects)
+            b.SetHardwareEffect(dev.Index, HardwareEffect.Static, 5, ColorMode.One, Rgb.Black, Rgb.Black);
         b.SetColor(dev.Index, id, color);
         b.Update(dev.Index);
     });

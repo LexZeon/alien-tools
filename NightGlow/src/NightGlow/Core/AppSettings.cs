@@ -12,8 +12,19 @@ public sealed class AppSettings
     public int Speed { get; set; } = 5;
     public int Brightness { get; set; } = 255;
     public int Duration { get; set; } = 4;               // 1..10, chassis per-light action length
-    public bool Reverse { get; set; }                     // software waves run last light -> first light
     public Dictionary<string, string> ZoneColors { get; set; } = new(); // "VID:PID/id" -> #RRGGBB
+
+    // spatial effects
+    public List<string> SelectedRegions { get; set; } = new() { "Keyboard", "Ring", "Logo", "Other" };
+    public string Direction { get; set; } = "LeftToRight";
+    public string Palette { get; set; } = "rainbow";
+    public bool AutoRain { get; set; } = true;
+
+    /// <summary>"VID:PID/id" -> region assignment ("ring:3", "logo", "other", "keyboard:1", "none").</summary>
+    public Dictionary<string, string> LightRegions { get; set; } = new();
+
+    /// <summary>"VID:PID/id" -> key scan code (extended keys + 0xE000), from key calibration.</summary>
+    public Dictionary<string, int> KeyMap { get; set; } = new();
 
     private static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NightGlow");
     private static string FilePath => Path.Combine(Dir, "settings.json");

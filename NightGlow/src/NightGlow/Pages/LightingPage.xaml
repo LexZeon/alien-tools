@@ -29,7 +29,7 @@
 
         <StackPanel Grid.ColumnSpan="2" Spacing="4">
             <TextBlock Text="灯光" Style="{StaticResource NgPageTitle}" />
-            <TextBlock Text="给每个灯区设置静态颜色，调节亮度。动态效果在“灯效”页。" Style="{StaticResource NgMuted}" />
+            <TextBlock Text="给每个灯区设置静态颜色、调节亮度，并把灯区分到“键盘 / 背部灯环 / Logo”等区域。动态效果在“灯效”页。" Style="{StaticResource NgMuted}" />
         </StackPanel>
 
         <!-- devices -->
@@ -95,8 +95,36 @@
                     </Grid>
                 </Border>
 
-                <InfoBar x:Name="NoZonesInfo" Severity="Informational" IsClosable="False" Title="还没有命名的灯区"
-                         Message="这个设备的灯区编号还不知道。整机颜色和硬件灯效可以直接用；要给单个灯区设颜色，先在下面“灯区标定”里逐个点亮编号并命名。" />
+                <InfoBar x:Name="NoZonesInfo" Severity="Informational" IsClosable="False" Title="还没有识别灯区"
+                         Message="整机颜色和硬件灯效可以直接用。想按“背部灯环 / Logo”选区域、玩流动和涟漪，先用下面的“灯光识别向导”点几下就好。" />
+
+                <Expander x:Name="IdentifyExpander" Header="灯光识别向导（找出背部灯环和 Logo）" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource NgMuted}" TextWrapping="Wrap"
+                                   Text="每次只点亮一个灯（白色）。看它亮在哪里，点对应的按钮就行；没亮就点“没亮”。灯环会按识别顺序排好，最后可以用“测试流动”检查方向。" />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button x:Name="IdStartButton" Content="开始识别" Style="{StaticResource AccentButtonStyle}" Click="IdStart_Click" />
+                            <Button x:Name="IdStopButton" Content="完成" Click="IdStop_Click" IsEnabled="False" />
+                        </StackPanel>
+                        <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource NgCardBrush}" BorderBrush="{ThemeResource NgCardBorderBrush}" BorderThickness="1">
+                            <StackPanel Spacing="12">
+                                <TextBlock x:Name="IdPrompt" Text="点“开始识别”。" TextWrapping="Wrap" />
+                                <StackPanel x:Name="IdChoices" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+                                    <Button Content="背部灯环" Tag="ring" Click="IdChoice_Click" Style="{StaticResource AccentButtonStyle}" />
+                                    <Button Content="Logo" Tag="logo" Click="IdChoice_Click" />
+                                    <Button Content="其他灯" Tag="other" Click="IdChoice_Click" />
+                                    <Button Content="没亮" Tag="skip" Click="IdChoice_Click" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <StackPanel x:Name="RingTools" Orientation="Horizontal" Spacing="8">
+                            <Button Content="测试流动" Click="RingTest_Click" ToolTipService.ToolTip="沿灯环顺序跑一圈：应该从左上角开始、顺时针走" />
+                            <Button Content="反转方向" Click="RingReverse_Click" />
+                            <Button Content="起点后移一格" Click="RingRotate_Click" />
+                        </StackPanel>
+                        <TextBlock x:Name="IdStatus" Style="{StaticResource NgMuted}" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Expander>
 
                 <StackPanel x:Name="ZonesSection" Spacing="10">
                     <TextBlock Text="灯区" Style="{StaticResource NgSectionTitle}" Margin="0" />
@@ -112,16 +140,31 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <Border Width="28" Height="28" CornerRadius="14" Background="{x:Bind Brush, Mode=OneWay}"
                                                 BorderBrush="{ThemeResource NgCardBorderBrush}" BorderThickness="1" />
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="{x:Bind Name, Mode=OneWay}" />
                                             <TextBlock Style="{StaticResource NgMuted}" FontSize="12">
-                                                <Run Text="编号 " /><Run Text="{x:Bind IdText}" /><Run Text="{x:Bind FlagText}" />
+                                                <Run Text="编号 " /><Run Text="{x:Bind IdText}" /><Run Text="{x:Bind FlagText}" /><Run Text="{x:Bind RegionText, Mode=OneWay}" />
                                             </TextBlock>
                                         </StackPanel>
-                                        <Button Grid.Column="2" Content="颜色" Click="ZoneColor_Click" Tag="{x:Bind}" />
+                                        <ComboBox Grid.Column="2" Width="150" VerticalAlignment="Center" SelectedIndex="{x:Bind RegionIndex, Mode=TwoWay}"
+                                                  ToolTipService.ToolTip="这个灯属于哪个区域（灯效页按区域选择）">
+                                            <ComboBoxItem Content="自动（按名称）" />
+                                            <ComboBoxItem Content="背部灯环" />
+                                            <ComboBoxItem Content="Logo" />
+                                            <ComboBoxItem Content="其他灯光" />
+                                            <ComboBoxItem Content="键盘" />
+                                            <ComboBoxItem Content="不参与灯效" />
+                                        </ComboBox>
+                                        <NumberBox Grid.Column="3" Width="96" VerticalAlignment="Center" Minimum="0" Maximum="255"
+                                                   Value="{x:Bind Order, Mode=TwoWay}" SpinButtonPlacementMode="Compact"
+                                                   Visibility="{x:Bind HasOrder, Mode=OneWay}"
+                                                   ToolTipService.ToolTip="在灯环里的顺序：从左上角开始顺时针数，0 是第一个" />
+                                        <Button Grid.Column="4" Content="颜色" Click="ZoneColor_Click" Tag="{x:Bind}" />
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -129,7 +172,7 @@
                     </ItemsControl>
                 </StackPanel>
 
-                <Expander x:Name="CalibExpander" Header="灯区标定" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Expander x:Name="CalibExpander" Header="手动标定（高级）" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                     <StackPanel Spacing="12">
                         <TextBlock Style="{StaticResource NgMuted}"
                                    Text="输入一个编号点亮它，看看是哪个灯，再起个名字保存。名字和 alien-tools 共用同一个存储位置。" />
@@ -143,6 +186,28 @@
                             <Button Content="保存为灯区" VerticalAlignment="Bottom" Style="{StaticResource AccentButtonStyle}" Click="SaveZone_Click" />
                         </StackPanel>
                         <TextBlock x:Name="ProbeStatus" Style="{StaticResource NgMuted}" FontSize="12" />
+                    </StackPanel>
+                </Expander>
+
+                <Expander x:Name="KeyCalibExpander" Header="键位标定（让灯效在键盘上逐键流动）" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource NgMuted}" TextWrapping="Wrap"
+                                   Text="NightGlow 会每次只点亮一个灯编号。看到哪个键亮了，就在键盘上按下那个键；没亮或者按不了（比如 Fn）就点“跳过”。只在下面的框获得焦点时读取按下的是哪个键，用来确定灯的位置，不记录其他输入。" />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button x:Name="KeyStartButton" Content="开始" Style="{StaticResource AccentButtonStyle}" Click="KeyStart_Click" />
+                            <Button x:Name="KeySkipButton" Content="跳过" Click="KeySkip_Click" IsEnabled="False" />
+                            <Button x:Name="KeyUndoButton" Content="撤销上一个" Click="KeyUndo_Click" IsEnabled="False" />
+                            <Button x:Name="KeyStopButton" Content="结束" Click="KeyStop_Click" IsEnabled="False" />
+                            <Button Content="清除全部键位" Click="KeyClear_Click" />
+                        </StackPanel>
+                        <ContentControl x:Name="KeyCapture" IsTabStop="True" UseSystemFocusVisuals="True" HorizontalContentAlignment="Stretch"
+                                        PreviewKeyDown="KeyCapture_PreviewKeyDown" Tapped="KeyCapture_Tapped">
+                            <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource NgCardBrush}"
+                                    BorderBrush="{ThemeResource NgCardBorderBrush}" BorderThickness="1">
+                                <TextBlock x:Name="KeyPrompt" Text="点“开始”后，在这里按键。" TextWrapping="Wrap" />
+                            </Border>
+                        </ContentControl>
+                        <TextBlock x:Name="KeyStatus" Style="{StaticResource NgMuted}" FontSize="12" TextWrapping="Wrap" />
                     </StackPanel>
                 </Expander>
             </StackPanel>

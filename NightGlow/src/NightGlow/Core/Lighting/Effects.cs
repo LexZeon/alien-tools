@@ -20,16 +20,13 @@ public sealed record EffectDefinition(
     ColorMode KeyboardColorMode,
     // per-light action for chassis lights (API v4 and older), if any
     LightActionType? ZoneAction,
-    string[] PreviewColors)
+    string[] PreviewColors,
+    bool HasDirection = false,
+    bool HasPalette = false,
+    bool Interactive = false)
 {
     /// <summary>Preset entries (such as the default blue) use this color instead of the user's colors.</summary>
     public Rgb? FixedColor { get; init; }
-
-    /// <summary>The effect flows along the lights and its direction can be reversed (software waves).</summary>
-    public bool HasDirection { get; init; }
-
-    /// <summary>Software effects that need at least two named lights to show movement.</summary>
-    public bool NeedsLightOrder { get; init; }
 
     /// <summary>
     /// Chassis lights (API v4) run this as a per-light hardware action whose phase length
@@ -41,20 +38,21 @@ public sealed record EffectDefinition(
     public string KindText => Kind switch
     {
         EffectKind.Hardware => "硬件",
-        EffectKind.Software => "软件",
+        EffectKind.Software => Interactive ? "互动" : "软件",
         _ => "",
     };
 }
 
-public sealed record EffectParameters(
-    Rgb Color1,
-    Rgb Color2,
-    int Speed /* 1..10 */,
-    byte Brightness /* 0..255 */,
-    int Duration = EffectParameters.DefaultDuration /* 1..10 */,
-    bool Reverse = false)
+public sealed record EffectParameters(Rgb Color1, Rgb Color2, int Speed /* 1..10 */, byte Brightness /* 0..255 */)
 {
     public const int DefaultDuration = 4;
+
+    public WaveDirection Direction { get; init; } = WaveDirection.LeftToRight;
+    public string PaletteId { get; init; } = "rainbow";
+    public bool AutoRain { get; init; } = true;
+    public int Duration { get; init; } = DefaultDuration; // 1..10
+
+    public Palette GetPalette() => Palette.Resolve(PaletteId, Color1, Color2);
 
     /// <summary>Hardware tempo byte for API v5 whole-device effects. Smaller = faster (to be verified on hardware).</summary>
     public byte KeyboardTempo => (byte)Math.Clamp(11 - Speed, 1, 10);
@@ -82,16 +80,21 @@ public static class EffectCatalog
 
     public static readonly IReadOnlyList<EffectDefinition> All = new EffectDefinition[]
     {
-        new("static", "静态", "所有灯区保持同一个颜色", EffectKind.Hardware, "", 1, false,
+        new("sp-wave", "彩虹波", "选中的区域连成一片，彩虹按方向流过键盘和灯环，节奏一致（软件）", EffectKind.Software, "", 0, true,
+            null, ColorMode.One, null, Rainbow, HasDirection: true, HasPalette: true),
+        new("sp-ripple", "水滴涟漪", "点击预览图放出波纹，像水滴落入水面；也可以自动下雨（软件）", EffectKind.Software, "", 0, true,
+            null, ColorMode.One, null, new[] { "#05070D", "#35D6E8", "#05070D", "#8B5CF6", "#05070D" }, HasPalette: true, Interactive: true),
+
+        new("static", "静态", "所有灯区保持同一个颜色", EffectKind.Hardware, "", 1, false,
             HardwareEffect.Static, ColorMode.One, LightActionType.Color, new[] { "#35D6E8", "#35D6E8" }),
-        new("default-blue", "默认蓝", "一键恢复成蓝色静态灯光，不需要选颜色", EffectKind.Hardware, "", 0, false,
+        new("default-blue", "默认蓝", "一键恢复成蓝色静态灯光，不需要选颜色", EffectKind.Hardware, "", 0, false,
             HardwareEffect.Static, ColorMode.One, LightActionType.Color, new[] { "#0A5CFF", "#0A5CFF" })
             { FixedColor = DefaultBlue },
-        new("rainbow-wave", "彩虹波", "彩虹色带横向流过键盘（硬件）", EffectKind.Hardware, "", 0, true,
-            HardwareEffect.SideWave, ColorMode.Spectrum, LightActionType.Spectrum, Rainbow),
+        new("rainbow-wave", "硬件彩虹波", "键盘用固件彩虹波（方向由固件决定）；灯环每段错开相位形成流动。关掉 NightGlow 也保持", EffectKind.Hardware, "", 0, true,
+            HardwareEffect.SideWave, ColorMode.Spectrum, LightActionType.Morph, Rainbow, HasDirection: true, HasPalette: true),
         new("breathing", "呼吸", "颜色缓慢亮起再熄灭", EffectKind.Hardware, "", 1, true,
             HardwareEffect.Breathing, ColorMode.One, LightActionType.Breathing, new[] { "#101018", "#8B5CF6", "#101018" }),
-        new("spectrum", "光谱循环", "所有灯区一起在全色谱中循环（硬件）", EffectKind.Hardware, "", 0, true,
+        new("spectrum", "光谱循环", "所有灯区一起在全色谱中循环（硬件）", EffectKind.Hardware, "", 0, true,
             HardwareEffect.Rainbow, ColorMode.Spectrum, LightActionType.Rainbow, Rainbow),
         new("side-wave", "单色波", "单一颜色的波浪", EffectKind.Hardware, "", 1, true,
             HardwareEffect.SideWave, ColorMode.One, LightActionType.Pulse, new[] { "#101018", "#35D6E8", "#101018", "#35D6E8" }),
@@ -99,25 +102,19 @@ public static class EffectCatalog
             HardwareEffect.DualWave, ColorMode.Two, LightActionType.Morph, new[] { "#35D6E8", "#8B5CF6", "#35D6E8", "#8B5CF6" }),
         new("pulse", "脉冲", "颜色快速闪烁", EffectKind.Hardware, "", 1, true,
             HardwareEffect.Pulse, ColorMode.One, LightActionType.Pulse, new[] { "#FF4D6D", "#101018", "#FF4D6D", "#101018" }),
-        new("morph", "渐变", "在两种颜色之间来回过渡", EffectKind.Hardware, "", 2, true,
+        new("morph", "渐变", "在两种颜色之间来回过渡", EffectKind.Hardware, "", 2, true,
             HardwareEffect.Morph, ColorMode.Two, LightActionType.Morph, new[] { "#FF7A18", "#AF002D" }),
         new("bounce", "弹跳", "光点来回弹跳（键盘）", EffectKind.Hardware, "", 1, true,
             HardwareEffect.Bounce, ColorMode.One, null, new[] { "#101018", "#3BFF6E", "#101018" }),
-        new("laser", "激光", "光束扫过键盘（键盘）", EffectKind.Hardware, "", 1, true,
+        new("laser", "激光", "光束扫过键盘（键盘）", EffectKind.Hardware, "", 1, true,
             HardwareEffect.Laser, ColorMode.One, null, new[] { "#101018", "#FF3B3B", "#101018" }),
 
-        new("sw-cycle", "颜色循环", "所有灯区一起平滑变换色相（软件，NightGlow 运行时生效）", EffectKind.Software, "", 0, true,
-            null, ColorMode.One, null, Rainbow),
+        new("sw-cycle", "颜色循环", "所有选中区域一起平滑变换颜色（软件）", EffectKind.Software, "", 0, true,
+            null, ColorMode.One, null, Rainbow, HasPalette: true),
         new("sw-breath", "柔和呼吸", "在两种颜色之间柔和呼吸（软件）", EffectKind.Software, "", 2, true,
             null, ColorMode.One, null, new[] { "#0B1E3F", "#35D6E8", "#0B1E3F" }),
-        new("sw-wave", "软件彩虹波", "按灯区顺序流动的彩虹，可调方向（软件，需要已命名的灯区）", EffectKind.Software, "", 0, true,
-            null, ColorMode.One, null, Rainbow)
-            { HasDirection = true, NeedsLightOrder = true },
-        new("sw-color-wave", "软件双色波", "两种颜色按灯区顺序流动，可调方向（软件，需要已命名的灯区）", EffectKind.Software, "", 2, true,
-            null, ColorMode.One, null, new[] { "#35D6E8", "#8B5CF6", "#35D6E8", "#8B5CF6" })
-            { HasDirection = true, NeedsLightOrder = true },
 
-        new("off", "关闭", "关闭所有灯光", EffectKind.Off, "", 0, false,
+        new("off", "关闭", "关闭选中区域的灯光", EffectKind.Off, "", 0, false,
             HardwareEffect.Static, ColorMode.One, LightActionType.Color, new[] { "#000000", "#000000" }),
     };
 

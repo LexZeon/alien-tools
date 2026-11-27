@@ -32,7 +32,7 @@ public partial class App : Application
         {
             // Services first: pages use them as soon as the window navigates.
             Settings = AppSettings.Load();
-            Lighting = new LightingService();
+            Lighting = new LightingService(Settings);
             Thermal = new ThermalService(DispatcherQueue.GetForCurrentThread());
 
             Window = new MainWindow();

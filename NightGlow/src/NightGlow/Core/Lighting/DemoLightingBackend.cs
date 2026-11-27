@@ -19,11 +19,12 @@ public sealed class DemoLightingBackend : ILightingBackend
 
     public IReadOnlyList<LightDevice> Open()
     {
+        // The real light ids of the ring are not known yet; the demo uses 12 ring segments.
         var elc = new LightDevice { Index = 0, Vid = 0x187C, Pid = 0x0551, Api = LightApi.V4, Name = "AW-ELC（演示）" };
-        elc.Zones.Add(new LightZone { Id = 0, Name = "背部灯带 左" });
-        elc.Zones.Add(new LightZone { Id = 1, Name = "背部灯带 右" });
-        elc.Zones.Add(new LightZone { Id = 2, Name = "屏幕徽标" });
-        elc.Zones.Add(new LightZone { Id = 3, Name = "电源键", Flags = 1 });
+        for (ushort i = 0; i < 12; i++)
+            elc.Zones.Add(new LightZone { Id = i, Name = $"灯环 {i + 1}" });
+        elc.Zones.Add(new LightZone { Id = 12, Name = "屏幕徽标" });
+        elc.Zones.Add(new LightZone { Id = 13, Name = "电源键", Flags = 1 });
         var kb = new LightDevice { Index = 1, Vid = 0x0D62, Pid = 0x2ABE, Api = LightApi.V5, Name = "Darfon Keyboard（演示）", HasHardwareEffects = true };
         var mouse = new LightDevice { Index = 2, Vid = 0x0461, Pid = 0x4E9D, Api = LightApi.V7, Name = "610M 鼠标（演示）" };
         mouse.Zones.Add(new LightZone { Id = 0, Name = "滚轮" });

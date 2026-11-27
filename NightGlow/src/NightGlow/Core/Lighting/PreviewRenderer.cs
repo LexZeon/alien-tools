@@ -1,34 +1,41 @@
 namespace NightGlow.Core.Lighting;
 
 /// <summary>
-/// Approximates what an effect looks like on a row of <c>n</c> lights, for the on-screen preview.
-/// Software effects use exactly the engine's math; hardware effects are drawn to resemble the
+/// What an effect looks like on one light, for the on-screen canvas. Software effects use
+/// exactly the engine's math and clock; hardware effects are drawn to resemble the
 /// controller's behavior (the real look depends on the firmware).
 /// </summary>
 public static class PreviewRenderer
 {
-    public static Rgb ColorAt(EffectDefinition fx, EffectParameters p, double seconds, int i, int n)
+    /// <summary>Returns null when the effect does not reach this light.</summary>
+    public static Rgb? ColorAt(EffectDefinition fx, EffectParameters p, Palette pal, double now, LayoutPoint pt, RippleField.Drop[] drops)
     {
+        if (fx.Kind == EffectKind.Software) return SpatialEffects.ColorAt(fx, p, pal, now, pt, drops);
+        if (fx.Kind == EffectKind.Off) return Rgb.Black;
+
+        bool firmware = pt.Device.HasHardwareEffects && fx.KeyboardEffect is not null;
+        if (!firmware && (fx.ZoneAction is null || pt.IsWholeDevice)) return null;
         p = p.For(fx);
-        double period = 12.0 / Math.Clamp(p.Speed, 1, 10);
-        double t = seconds / period;
-        double x = n > 1 ? (double)i / (n - 1) : 0;
+
+        double t = now / SpatialEffects.Period(p.Speed);
         double bright = p.Brightness / 255.0;
         Rgb dark = Rgb.Black;
+        // keyboard firmware effects run left to right across the keys; chassis lights animate together
+        double x = firmware ? Math.Clamp((pt.X - SpatialLayout.KeyboardFrame.X) / SpatialLayout.KeyboardFrame.W, 0, 1) : 0;
 
         switch (fx.Id)
         {
             case "static":
             case "default-blue":
                 return p.Color1.Scale(bright);
-            case "off":
-                return dark;
             case "breathing":
                 return Rgb.Lerp(dark, p.Color1, (1 - Math.Cos(t * 2 * Math.PI)) / 2).Scale(bright);
             case "spectrum":
                 return Rgb.FromHsv(t * 360, 1, bright);
             case "rainbow-wave":
-                return Rgb.FromHsv(t * 360 - x * 300, 1, bright);
+                return firmware
+                    ? Rgb.FromHsv((t - x) * 360, 1, bright)
+                    : pal.Sample(t - SpatialEffects.Project(pt, p.Direction)).Scale(bright);
             case "side-wave":
             {
                 double d = Frac(t - x);
@@ -51,7 +58,7 @@ public static class PreviewRenderer
                 return Rgb.Lerp(dark, p.Color1, Math.Max(0, 1 - Math.Abs(x - pos) * 10)).Scale(bright);
             }
             default:
-                return EffectEngine.ColorAt(fx, p, t, i, n);
+                return p.Color1.Scale(bright);
         }
     }
 

@@ -57,10 +57,16 @@ public sealed partial class HomePage : Page, IRefreshable
     private EffectParameters CurrentParams() => new(
         Rgb.TryParse(App.Settings.Color1, out var c1) ? c1 : Rgb.White,
         Rgb.TryParse(App.Settings.Color2, out var c2) ? c2 : Rgb.White,
-        App.Settings.Speed, (byte)App.Settings.Brightness, App.Settings.Duration, App.Settings.Reverse);
+        App.Settings.Speed, (byte)App.Settings.Brightness)
+    {
+        Direction = Enum.TryParse<WaveDirection>(App.Settings.Direction, out var d) ? d : WaveDirection.LeftToRight,
+        PaletteId = App.Settings.Palette,
+        AutoRain = App.Settings.AutoRain,
+        Duration = App.Settings.Duration,
+    };
 
     private async void QuickRainbow_Click(object sender, RoutedEventArgs e) =>
-        await App.Lighting.ApplyEffectAsync(EffectCatalog.Find("rainbow-wave")!, CurrentParams(), App.Lighting.Devices.ToList());
+        await App.Lighting.ApplyEffectAsync(EffectCatalog.Find("sp-wave")!, CurrentParams(), App.Lighting.Devices.ToList());
 
     private async void QuickWhite_Click(object sender, RoutedEventArgs e) =>
         await App.Lighting.ApplyEffectAsync(EffectCatalog.Find("static")!, CurrentParams() with { Color1 = Rgb.White }, App.Lighting.Devices.ToList());

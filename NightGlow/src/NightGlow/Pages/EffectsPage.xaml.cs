@@ -21,22 +21,27 @@ public static class EffectVisuals
     }
 }
 
-public sealed partial class TargetRow : ObservableObject
+/// <summary>One selectable region (keyboard, ring, logo, other).</summary>
+public sealed partial class RegionChip : ObservableObject
 {
-    public required LightDevice Device { get; init; }
-    public string Title => $"{Device.Kind}（{Device.IdText}）";
-    [ObservableProperty] private bool _isChecked = true;
-    [ObservableProperty] private bool _isSupported = true;
+    public required RegionKind Kind { get; init; }
+    public string Name => Regions.Name(Kind);
+    public string Glyph => Regions.Glyph(Kind);
+    [ObservableProperty] private bool _isChecked;
+    [ObservableProperty] private bool _isAvailable = true;
     [ObservableProperty] private string _note = "";
+
+    public event EventHandler? CheckedChanged;
+    partial void OnIsCheckedChanged(bool value) => CheckedChanged?.Invoke(this, EventArgs.Empty);
 }
 
 public sealed partial class EffectsPage : Page, IRefreshable
 {
-    private const int PreviewLights = 16;
-    private readonly List<Border> _previewCells = new();
-    private readonly List<TargetRow> _targets = new();
-    private readonly DispatcherTimer _previewTimer = new() { Interval = TimeSpan.FromMilliseconds(40) };
-    private readonly DateTime _t0 = DateTime.UtcNow;
+    private readonly List<RegionChip> _chips = new();
+    private readonly DispatcherTimer _previewTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
+    // changes are applied right away (like a vendor control center), debounced so slider drags stay smooth
+    private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly Dictionary<int, LayoutPoint> _centers = new();
     private EffectDefinition? _fx;
     private Rgb _c1, _c2;
     private bool _loading = true;
@@ -44,14 +49,24 @@ public sealed partial class EffectsPage : Page, IRefreshable
     public EffectsPage()
     {
         InitializeComponent();
-        for (int i = 0; i < PreviewLights; i++)
-        {
-            var cell = new Border { Width = 13, Height = 40, CornerRadius = new CornerRadius(4) };
-            _previewCells.Add(cell);
-            PreviewStrip.Children.Add(cell);
-        }
         _previewTimer.Tick += (_, _) => RenderPreview();
+        _applyTimer.Tick += async (_, _) => { _applyTimer.Stop(); await ApplyNowAsync(); };
         EffectGrid.ItemsSource = EffectCatalog.All;
+        PaletteGrid.ItemsSource = Palette.All;
+        foreach (var (_, name, glyph) in WaveDirections.All) DirectionBox.Items.Add($"{glyph}   {name}");
+        foreach (var k in Regions.All)
+        {
+            var chip = new RegionChip { Kind = k };
+            chip.CheckedChanged += Chip_CheckedChanged;
+            _chips.Add(chip);
+        }
+        RegionList.ItemsSource = _chips;
+        LaptopView.RegionTapped += (_, kind) =>
+        {
+            var chip = _chips.First(c => c.Kind == kind);
+            if (chip.IsAvailable) chip.IsChecked = !chip.IsChecked;
+        };
+        LaptopView.SurfaceTapped += (_, pos) => App.Lighting.Ripples.Add(pos.X, pos.Y);
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -62,57 +77,133 @@ public sealed partial class EffectsPage : Page, IRefreshable
         _c2 = Rgb.TryParse(s.Color2, out var c2) ? c2 : new Rgb(0x8B, 0x5C, 0xF6);
         SpeedSlider.Value = Math.Clamp(s.Speed, 1, 10);
         BrightSlider.Value = Math.Clamp(Math.Round(s.Brightness / 2.55), 10, 100);
+        var dir = Enum.TryParse<WaveDirection>(s.Direction, out var d) ? d : WaveDirection.LeftToRight;
+        DirectionBox.SelectedIndex = Math.Max(0, Array.FindIndex(WaveDirections.All, x => x.Dir == dir));
+        PaletteGrid.SelectedItem = Palette.All.FirstOrDefault(p => p.Id == s.Palette) ?? Palette.All[0];
+        RainSwitch.IsOn = s.AutoRain;
         DurationSlider.Value = Math.Clamp(s.Duration, 1, 10);
-        ReverseSwitch.IsOn = s.Reverse;
         ModeButtons.SelectedIndex = (int)App.Lighting.Mode;
+        foreach (var chip in _chips) chip.IsChecked = s.SelectedRegions.Contains(chip.Kind.ToString());
         UpdateSwatches();
-        _loading = false;
 
+        App.Lighting.LayoutChanged += Lighting_LayoutChanged;
+        // opening the page shows the last effect but does not send anything to the lights
         EffectGrid.SelectedItem = EffectCatalog.Find(s.EffectId) ?? EffectCatalog.All[0];
+        _loading = false;
         Refresh();
         _previewTimer.Start();
     }
 
-    protected override void OnNavigatedFrom(NavigationEventArgs e) => _previewTimer.Stop();
+    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    {
+        _previewTimer.Stop();
+        if (_applyTimer.IsEnabled) { _applyTimer.Stop(); _ = ApplyNowAsync(); }
+        App.Lighting.LayoutChanged -= Lighting_LayoutChanged;
+    }
+
+    private void ScheduleApply()
+    {
+        if (_loading) return;
+        _applyTimer.Stop();
+        _applyTimer.Start();
+    }
+
+    private void Lighting_LayoutChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(Refresh);
 
     public void Refresh()
     {
-        _targets.Clear();
-        foreach (var d in App.Lighting.Devices) _targets.Add(new TargetRow { Device = d });
-        TargetList.ItemsSource = null;
-        TargetList.ItemsSource = _targets;
-        UpdateTargets();
+        var layout = App.Lighting.Layout;
+        LaptopView.SetLayout(layout);
+        _centers.Clear();
+        UpdateRegions();
+    }
+
+    private IEnumerable<RegionKind> SelectedKinds => _chips.Where(c => c.IsChecked && c.IsAvailable).Select(c => c.Kind);
+
+    private void Chip_CheckedChanged(object? sender, EventArgs e)
+    {
+        LaptopView.SetSelected(SelectedKinds);
+        if (_loading) return;
+        App.Settings.SelectedRegions = _chips.Where(c => c.IsChecked).Select(c => c.Kind.ToString()).ToList();
+        UpdateRegionNote();
+        ScheduleApply();
+    }
+
+    private void UpdateRegions()
+    {
+        var layout = App.Lighting.Layout;
+        foreach (var chip in _chips)
+        {
+            var region = layout.Get(chip.Kind);
+            if (region is null)
+            {
+                chip.IsAvailable = false;
+                chip.Note = chip.Kind == RegionKind.Keyboard ? "没有找到键盘灯光" : "还没标定：到“灯光”页给灯区起名并分配区域";
+                continue;
+            }
+            var (ok, note) = _fx is null ? (true, "") : LightingService.Supports(region, _fx);
+            chip.IsAvailable = ok;
+            chip.Note = $"{region.Points.Count} 个灯 · {note}";
+        }
+        LaptopView.SetSelected(SelectedKinds);
+        UpdateRegionNote();
+    }
+
+    private void UpdateRegionNote()
+    {
+        var missing = _chips.Where(c => !c.IsAvailable && App.Lighting.Layout.Get(c.Kind) is null).Select(c => c.Name).ToList();
+        var kb = App.Lighting.Layout.Get(RegionKind.Keyboard);
+        var parts = new List<string>();
+        if (kb is { IsWholeDevice: true } && _fx?.Kind == EffectKind.Software)
+            parts.Add("键盘还没标定键位，软件灯效下整块键盘显示同一颜色；到“灯光”页做键位标定后可以逐键流动。");
+        if (missing.Count > 0) parts.Add("未标定：" + string.Join("、", missing) + "。");
+        RegionNote.Text = string.Join(" ", parts);
+        RegionNote.Visibility = parts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private EffectParameters Params() =>
-        new(_c1, _c2, (int)SpeedSlider.Value, (byte)Math.Round(BrightSlider.Value * 2.55),
-            (int)DurationSlider.Value, ReverseSwitch.IsOn);
+        new(_c1, _c2, (int)SpeedSlider.Value, (byte)Math.Round(BrightSlider.Value * 2.55))
+        {
+            Direction = WaveDirections.All[Math.Max(0, DirectionBox.SelectedIndex)].Dir,
+            PaletteId = (PaletteGrid.SelectedItem as Palette)?.Id ?? "rainbow",
+            AutoRain = RainSwitch.IsOn,
+            Duration = (int)DurationSlider.Value,
+        };
 
     private void EffectGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _fx = EffectGrid.SelectedItem as EffectDefinition;
         if (_fx is null) return;
-        FxName.Text = _fx.Name + (_fx.Kind == EffectKind.Hardware ? "（硬件）" : _fx.Kind == EffectKind.Software ? "（软件）" : "");
+        FxName.Text = _fx.Name + (_fx.Kind == EffectKind.Hardware ? "（硬件）" : _fx.Kind == EffectKind.Software ? (_fx.Interactive ? "（互动）" : "（软件）") : "");
         FxDesc.Text = _fx.Description;
-        ColorRow.Visibility = _fx.ColorCount > 0 ? Visibility.Visible : Visibility.Collapsed;
-        Color2Button.Visibility = _fx.ColorCount > 1 ? Visibility.Visible : Visibility.Collapsed;
-        SpeedRow.Visibility = _fx.HasSpeed ? Visibility.Visible : Visibility.Collapsed;
-        DurationRow.Visibility = _fx.HasDuration ? Visibility.Visible : Visibility.Collapsed;
-        ReverseSwitch.Visibility = _fx.HasDirection ? Visibility.Visible : Visibility.Collapsed;
-        UpdateTargets();
+        UpdateOptionRows();
+        LaptopView.InteractiveMode = _fx.Interactive;
+        CanvasHint.Text = _fx.Interactive ? "点击任意位置放出波纹 · 区域在右侧选择" : "点击区域选中或取消";
+        UpdateRegions();
+        ScheduleApply();
     }
 
-    private void UpdateTargets()
+    private void UpdateOptionRows()
     {
         if (_fx is null) return;
-        foreach (var t in _targets)
-        {
-            t.IsSupported = LightingService.Supports(t.Device, _fx);
-            t.Note = !t.IsSupported
-                ? (t.Device.Zones.Count == 0 ? "这个设备还没标定灯区，暂不支持此灯效" : "这个设备不支持此灯效")
-                : t.Device.HasHardwareEffects && _fx.KeyboardEffect is not null && _fx.Kind == EffectKind.Hardware ? "由键盘硬件运行"
-                : _fx.Kind == EffectKind.Software ? "NightGlow 计算并实时下发" : "逐个灯区下发";
-        }
+        bool custom = _fx.HasPalette && (PaletteGrid.SelectedItem as Palette)?.Id == Palette.CustomId;
+        int colors = Math.Max(_fx.ColorCount, custom ? 2 : 0);
+        ColorRow.Visibility = colors > 0 ? Visibility.Visible : Visibility.Collapsed;
+        Color2Button.Visibility = colors > 1 ? Visibility.Visible : Visibility.Collapsed;
+        SpeedRow.Visibility = _fx.HasSpeed ? Visibility.Visible : Visibility.Collapsed;
+        DurationRow.Visibility = _fx.HasDuration ? Visibility.Visible : Visibility.Collapsed;
+        DirectionRow.Visibility = _fx.HasDirection ? Visibility.Visible : Visibility.Collapsed;
+        PaletteRow.Visibility = _fx.HasPalette ? Visibility.Visible : Visibility.Collapsed;
+        RainRow.Visibility = _fx.Interactive ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void Option_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        App.Settings.Direction = WaveDirections.All[Math.Max(0, DirectionBox.SelectedIndex)].Dir.ToString();
+        App.Settings.Palette = (PaletteGrid.SelectedItem as Palette)?.Id ?? "rainbow";
+        UpdateOptionRows();
+        ScheduleApply();
     }
 
     private void Param_Changed(object sender, RangeBaseValueChangedEventArgs e)
@@ -121,12 +212,7 @@ public sealed partial class EffectsPage : Page, IRefreshable
         App.Settings.Speed = (int)SpeedSlider.Value;
         App.Settings.Brightness = (int)Math.Round(BrightSlider.Value * 2.55);
         App.Settings.Duration = (int)DurationSlider.Value;
-    }
-
-    private void ReverseSwitch_Toggled(object sender, RoutedEventArgs e)
-    {
-        if (_loading) return;
-        App.Settings.Reverse = ReverseSwitch.IsOn;
+        ScheduleApply();
     }
 
     private async void ModeButtons_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -146,17 +232,41 @@ public sealed partial class EffectsPage : Page, IRefreshable
         ApplyStatus.Text = what + (App.Lighting.IsSimulated ? "（演示模式，没有发送到硬件）。" : "。");
     }
 
+    private void Rain_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        App.Settings.AutoRain = RainSwitch.IsOn;
+        ScheduleApply();
+    }
+
     private void RenderPreview()
     {
         if (_fx is null) return;
+        var fx = _fx;
         var p = Params();
-        double sec = (DateTime.UtcNow - _t0).TotalSeconds;
-        for (int i = 0; i < _previewCells.Count; i++)
+        var pal = p.GetPalette();
+        double now = EffectClock.Now;
+        var drops = fx.Interactive
+            ? App.Lighting.Ripples.Frame(now, SpatialEffects.RippleLife(p.Speed), p.AutoRain, SpatialEffects.RainEvery(p.Speed))
+            : Array.Empty<RippleField.Drop>();
+
+        LaptopView.Render(pt =>
         {
-            var c = PreviewRenderer.ColorAt(_fx, p, sec, i, _previewCells.Count);
-            if (_previewCells[i].Background is SolidColorBrush sb) sb.Color = c.ToColor();
-            else _previewCells[i].Background = new SolidColorBrush(c.ToColor());
+            // a keyboard without key map gets one color for all keys in software effects:
+            // sample it where the engine does, at the keyboard center
+            var q = pt.IsWholeDevice && fx.Kind != EffectKind.Hardware ? Center(pt) : pt;
+            return PreviewRenderer.ColorAt(fx, p, pal, now, q, drops);
+        }, drops, pal, now, p.Speed);
+    }
+
+    private LayoutPoint Center(LayoutPoint pt)
+    {
+        if (!_centers.TryGetValue(pt.Device.Index, out var c))
+        {
+            c = App.Lighting.Layout.Get(RegionKind.Keyboard)?.Points.FirstOrDefault(x => x.Device.Index == pt.Device.Index) ?? pt;
+            _centers[pt.Device.Index] = c;
         }
+        return c;
     }
 
     private void UpdateSwatches()
@@ -178,28 +288,33 @@ public sealed partial class EffectsPage : Page, IRefreshable
             UpdateSwatches();
         };
         var flyout = new Flyout { Content = picker };
+        flyout.Closed += (_, _) => ScheduleApply();
         flyout.ShowAt(btn);
     }
 
     private async void Apply_Click(object sender, RoutedEventArgs e)
     {
+        _applyTimer.Stop();
+        await ApplyNowAsync();
+    }
+
+    private async Task ApplyNowAsync()
+    {
         if (_fx is null) return;
-        var targets = _targets.Where(t => t.IsChecked && t.IsSupported).Select(t => t.Device).ToList();
-        if (targets.Count == 0) { ApplyStatus.Text = "没有可应用的设备。"; return; }
-        ApplyButton.IsEnabled = false;
-        try
-        {
-            await App.Lighting.ApplyEffectAsync(_fx, Params(), targets);
-            App.Settings.EffectId = _fx.Id;
-            App.Settings.Save();
-            _loading = true;
-            ModeButtons.SelectedIndex = (int)App.Lighting.Mode; // applying returns to normal mode
-            _loading = false;
-            ApplyStatus.Text = App.Lighting.IsSimulated
-                ? $"已在演示模式下应用“{_fx.Name}”（没有发送到硬件）。"
-                : $"已应用“{_fx.Name}”到 {targets.Count} 个设备。";
-        }
-        finally { ApplyButton.IsEnabled = true; }
+        var kinds = SelectedKinds.ToList();
+        var points = App.Lighting.Layout.PointsIn(kinds);
+        if (points.Count == 0) { ApplyStatus.Text = "请先选择至少一个区域。"; return; }
+        var fx = _fx;
+        await App.Lighting.ApplyEffectAsync(fx, Params(), points);
+        App.Settings.EffectId = fx.Id;
+        App.Settings.Save();
+        _loading = true;
+        ModeButtons.SelectedIndex = (int)App.Lighting.Mode; // applying returns to normal mode
+        _loading = false;
+        var names = string.Join("、", kinds.Select(Regions.Name));
+        ApplyStatus.Text = App.Lighting.IsSimulated
+            ? $"演示模式：“{fx.Name}”→ {names}（没有发送到硬件）。"
+            : $"已应用“{fx.Name}”→ {names}。" + (fx.Kind == EffectKind.Software ? "关闭 NightGlow 后灯光停在最后一帧。" : "");
     }
 
     private void Stop_Click(object sender, RoutedEventArgs e)
