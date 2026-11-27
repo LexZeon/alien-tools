@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="NightGlow.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <ScrollViewer>
+        <StackPanel Padding="36,24,36,36" Spacing="18" MaxWidth="900" HorizontalAlignment="Left">
+            <TextBlock Text="设置与关于" Style="{StaticResource NgPageTitle}" />
+
+            <Border Style="{StaticResource NgCard}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="外观" Style="{StaticResource NgSectionTitle}" Margin="0" />
+                    <RadioButtons x:Name="ThemeRadios" Header="主题" SelectionChanged="ThemeRadios_SelectionChanged">
+                        <x:String>深色</x:String>
+                        <x:String>浅色</x:String>
+                        <x:String>跟随系统</x:String>
+                    </RadioButtons>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource NgCard}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="运行状态" Style="{StaticResource NgSectionTitle}" Margin="0" />
+                    <TextBlock x:Name="CoreText" Style="{StaticResource NgMuted}" />
+                    <TextBlock x:Name="AdminText" Style="{StaticResource NgMuted}" />
+                    <TextBlock x:Name="VendorText" Style="{StaticResource NgMuted}" />
+                    <Button Content="重新扫描灯光设备" Click="Rescan_Click" Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource NgCard}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="关于 NightGlow" Style="{StaticResource NgSectionTitle}" Margin="0" />
+                    <TextBlock x:Name="VersionText" Style="{StaticResource NgMuted}" />
+                    <TextBlock TextWrapping="Wrap">
+                        适用于 Alienware 笔记本的灯光、风扇和电源控制工具。本软件是社区项目，与 Dell / Alienware 没有任何关系，也没有得到它们的认可。
+                    </TextBlock>
+                    <TextBlock TextWrapping="Wrap" Foreground="{ThemeResource NgWarnBrush}">
+                        本软件会直接控制灯光、风扇和电源模式，使用风险自负。
+                    </TextBlock>
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource NgMuted}">
+                        硬件控制部分来自 alien-tools（作者 T-Troll 及贡献者，MIT 许可证）。NightGlow 本身也以 MIT 许可证发布。第三方组件和许可证见程序目录里的 THIRD_PARTY_NOTICES.md。
+                    </TextBlock>
+                    <HyperlinkButton Content="alien-tools 上游项目" NavigateUri="https://github.com/T-Troll/alien-tools" Padding="0" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

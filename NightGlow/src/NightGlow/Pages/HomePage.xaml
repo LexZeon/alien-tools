@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="NightGlow.Pages.HomePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="using:NightGlow.Core"
+    Background="Transparent">
+
+    <ScrollViewer>
+        <StackPanel Padding="36,24,36,36" Spacing="20" MaxWidth="1200" HorizontalAlignment="Stretch">
+
+            <!-- hero -->
+            <Grid CornerRadius="16" Height="170">
+                <Rectangle x:Name="HeroGlow" RadiusX="16" RadiusY="16" Fill="{StaticResource NgGlowBrush}" Opacity="0.85" />
+                <Rectangle RadiusX="16" RadiusY="16">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#E60B0E1A" Offset="0" />
+                            <GradientStop Color="#990B0E1A" Offset="0.55" />
+                            <GradientStop Color="#000B0E1A" Offset="1" />
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <StackPanel Padding="28,24" VerticalAlignment="Center" Spacing="6">
+                    <TextBlock Text="NightGlow" FontSize="36" FontWeight="SemiBold" Foreground="White" />
+                    <TextBlock x:Name="ModelText" Text="正在识别设备…" Foreground="#CCFFFFFF" FontSize="15" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                        <Button x:Name="QuickRainbow" Click="QuickRainbow_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE790;" FontSize="14" /><TextBlock Text="彩虹波" /></StackPanel>
+                        </Button>
+                        <Button x:Name="QuickWhite" Click="QuickWhite_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE706;" FontSize="14" /><TextBlock Text="静态白光" /></StackPanel>
+                        </Button>
+                        <Button x:Name="QuickOff" Click="QuickOff_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE708;" FontSize="14" /><TextBlock Text="关闭灯光" /></StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <!-- status messages -->
+            <InfoBar x:Name="DemoInfo" Severity="Warning" IsClosable="False" Title="演示模式"
+                     Message="没有找到核心库 nightglow_core.dll，界面里的设备和数值都是模拟的，不会控制硬件。编译核心库的方法见 README。" />
+            <InfoBar x:Name="VendorInfo" Severity="Informational" IsClosable="True" Title="厂商控制中心正在运行"
+                     Message="它会重新应用自己的灯光和散热设置，可能覆盖 NightGlow 的设置。NightGlow 不会去停止它。" />
+
+            <!-- cards -->
+            <Grid ColumnSpacing="16" RowSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource NgCard}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE790;" FontSize="16" Foreground="{StaticResource NgAccentBrush}" />
+                            <TextBlock Text="当前灯效" Style="{StaticResource NgMuted}" />
+                        </StackPanel>
+                        <TextBlock x:Name="EffectText" Text="未设置" Style="{StaticResource NgBigNumber}" />
+                        <HyperlinkButton Content="打开灯效库" Padding="0" Click="GoEffects_Click" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource NgCard}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xEC4A;" FontSize="16" Foreground="{StaticResource NgAccentBrush}" />
+                            <TextBlock Text="性能模式" Style="{StaticResource NgMuted}" />
+                        </StackPanel>
+                        <TextBlock x:Name="ModeText" Text="—" Style="{StaticResource NgBigNumber}" />
+                        <TextBlock x:Name="ModeHint" Text="" Style="{StaticResource NgMuted}" FontSize="12" />
+                        <HyperlinkButton Content="性能与散热" Padding="0" Click="GoPerf_Click" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource NgCard}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE9CA;" FontSize="16" Foreground="{StaticResource NgAccentBrush}" />
+                            <TextBlock Text="温度" Style="{StaticResource NgMuted}" />
+                        </StackPanel>
+                        <ItemsControl x:Name="TempList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="core:SensorReading">
+                                    <Grid Margin="0,2">
+                                        <TextBlock Text="{x:Bind Name}" Style="{StaticResource NgMuted}" />
+                                        <TextBlock HorizontalAlignment="Right" FontWeight="SemiBold">
+                                            <Run Text="{x:Bind Celsius}" /><Run Text=" °C" />
+                                        </TextBlock>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="TempHint" Text="需要管理员权限" Style="{StaticResource NgMuted}" FontSize="12" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <TextBlock Text="检测到的灯光设备" Style="{StaticResource NgSectionTitle}" Margin="0,8,0,0" />
+            <ItemsControl x:Name="DeviceList">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="10" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="core:LightDevice">
+                        <Border Style="{StaticResource NgCard}" Padding="16,12">
+                            <Grid ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="40" Height="40" CornerRadius="10" Background="{StaticResource NgGlowBrush}">
+                                    <FontIcon Glyph="{x:Bind Glyph}" Foreground="White" FontSize="18" />
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{x:Bind Kind}" FontWeight="SemiBold" />
+                                    <TextBlock Style="{StaticResource NgMuted}" FontSize="12">
+                                        <Run Text="{x:Bind Name}" /><Run Text="  ·  " /><Run Text="{x:Bind IdText}" /><Run Text="  ·  " /><Run Text="{x:Bind ApiText}" />
+                                    </TextBlock>
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Style="{StaticResource NgMuted}">
+                                    <Run Text="{x:Bind Zones.Count}" /><Run Text=" 个已命名灯区" />
+                                </TextBlock>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock x:Name="NoDevices" Text="没有找到灯光设备。" Style="{StaticResource NgMuted}" Visibility="Collapsed" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

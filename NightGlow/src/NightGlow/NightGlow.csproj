@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RootNamespace>NightGlow</RootNamespace>
+    <AssemblyName>NightGlow</AssemblyName>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- MVVMTK0045 only matters for Native AOT publishing, which NightGlow does not use. -->
+    <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\NightGlow.ico</ApplicationIcon>
+    <Version>0.1.0</Version>
+    <Product>NightGlow</Product>
+    <Description>Lighting, fan and power control for Alienware laptops (unofficial)</Description>
+    <Copyright>Copyright (c) 2026 NightGlow contributors. MIT License.</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Pick up the native core when it has been built (NightGlow\bin\<Config>\nightglow_core.dll).
+       Without it the app starts in demo mode. -->
+  <ItemGroup>
+    <None Include="..\..\bin\$(Configuration)\nightglow_core.dll" Condition="Exists('..\..\bin\$(Configuration)\nightglow_core.dll')" CopyToOutputDirectory="PreserveNewest" Link="nightglow_core.dll" />
+    <None Include="..\..\bin\Release\nightglow_core.dll" Condition="'$(Configuration)' != 'Release' And !Exists('..\..\bin\$(Configuration)\nightglow_core.dll') And Exists('..\..\bin\Release\nightglow_core.dll')" CopyToOutputDirectory="PreserveNewest" Link="nightglow_core.dll" />
+  </ItemGroup>
+
+</Project>

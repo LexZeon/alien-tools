@@ -1,0 +1,170 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using NightGlow.Core.Interop;
+
+namespace NightGlow.Core.Lighting;
+
+/// <summary>
+/// App-level lighting facade. All hardware calls are serialized on one exclusive scheduler,
+/// so the UI thread never blocks on HID writes and calls never interleave.
+/// </summary>
+public sealed partial class LightingService : ObservableObject, IDisposable
+{
+    private readonly TaskFactory _hw;
+    private readonly EffectEngine _engine;
+
+    public ILightingBackend Backend { get; }
+    public bool IsSimulated => Backend.IsSimulated;
+    public string CoreStatus { get; }
+
+    public ObservableCollection<LightDevice> Devices { get; } = new();
+
+    [ObservableProperty] private string _activeEffectName = "未设置";
+
+    /// <summary>Last hardware error (set on the hardware thread, so not observable).</summary>
+    public string? LastError { get; private set; }
+
+    public LightingService()
+    {
+        _hw = new TaskFactory(new ConcurrentExclusiveSchedulerPair().ExclusiveScheduler);
+        if (NativeMethods.TryProbe(out var reason))
+        {
+            Backend = new NativeLightingBackend();
+            CoreStatus = "核心库已加载";
+        }
+        else
+        {
+            Backend = new DemoLightingBackend();
+            CoreStatus = reason + "，正在使用演示模式（不会控制硬件）";
+        }
+        _engine = new EffectEngine(this);
+    }
+
+    internal Task Run(Action<ILightingBackend> work) => _hw.StartNew(() =>
+    {
+        try { work(Backend); }
+        catch (Exception ex) { LastError = ex.Message; }
+    });
+
+    internal Task<T> Run<T>(Func<ILightingBackend, T> work) => _hw.StartNew(() => work(Backend));
+
+    public async Task RefreshAsync()
+    {
+        var list = await Run(b => b.Open());
+        Devices.Clear();
+        foreach (var d in list) Devices.Add(d);
+    }
+
+    public async Task SetZoneColorAsync(LightDevice dev, LightZone zone, Rgb color)
+    {
+        _engine.Stop();
+        await Run(b => { b.SetColor(dev.Index, zone.Id, color); b.Update(dev.Index); });
+    }
+
+    public async Task SetDeviceColorAsync(LightDevice dev, Rgb color)
+    {
+        _engine.Stop();
+        await Run(b => ApplyStatic(b, dev, color));
+        ActiveEffectName = "静态";
+    }
+
+    public async Task SetBrightnessAsync(LightDevice dev, byte brightness)
+    {
+        dev.Brightness = brightness;
+        await Run(b => b.SetBrightness(dev.Index, brightness, false));
+    }
+
+    public async Task ApplyEffectAsync(EffectDefinition fx, EffectParameters p, IReadOnlyList<LightDevice> targets)
+    {
+        _engine.Stop();
+        if (fx.Kind == EffectKind.Software)
+        {
+            _engine.Start(fx, p, targets);
+            ActiveEffectName = fx.Name;
+            return;
+        }
+        await Run(b =>
+        {
+            foreach (var dev in targets)
+            {
+                if (fx.Kind == EffectKind.Off)
+                {
+                    ApplyStatic(b, dev, Rgb.Black);
+                    continue;
+                }
+                ApplyHardware(b, dev, fx, p);
+            }
+        });
+        ActiveEffectName = fx.Name;
+    }
+
+    public void StopSoftwareEffect() => _engine.Stop();
+
+    /// <summary>Static color on every zone; keyboards without named zones use their hardware static effect.</summary>
+    internal static void ApplyStatic(ILightingBackend b, LightDevice dev, Rgb color)
+    {
+        if (dev.Zones.Count > 0)
+            b.SetColors(dev.Index, dev.Zones.Select(z => (z.Id, color)).ToList());
+        else if (dev.HasHardwareEffects)
+            b.SetHardwareEffect(dev.Index, HardwareEffect.Static, 5, ColorMode.One, color, color);
+    }
+
+    private static void ApplyHardware(ILightingBackend b, LightDevice dev, EffectDefinition fx, EffectParameters p)
+    {
+        if (dev.HasHardwareEffects && fx.KeyboardEffect is { } ke)
+        {
+            b.SetHardwareEffect(dev.Index, ke, p.KeyboardTempo, fx.KeyboardColorMode, p.Color1, p.Color2);
+            return;
+        }
+        if (fx.ZoneAction is not { } za || dev.Zones.Count == 0)
+            return; // effect not available on this device
+
+        foreach (var zone in dev.Zones)
+        {
+            var actions = za switch
+            {
+                LightActionType.Color => new[] { new LightAction(za, 0, 0, p.Color1) },
+                LightActionType.Morph => new[] { new LightAction(za, 7, p.ZoneTempo, p.Color1), new LightAction(za, 7, p.ZoneTempo, p.Color2) },
+                _ => new[] { new LightAction(za, 7, p.ZoneTempo, p.Color1) },
+            };
+            b.SetAction(dev.Index, zone.Id, actions);
+        }
+        b.Update(dev.Index);
+    }
+
+    /// <summary>Which devices can show this effect at all (for the UI).</summary>
+    public static bool Supports(LightDevice dev, EffectDefinition fx) => fx.Kind switch
+    {
+        EffectKind.Off => true,
+        EffectKind.Software => fx.Id != "sw-wave" ? (dev.Zones.Count > 0 || dev.HasHardwareEffects) : dev.Zones.Count > 1,
+        _ => (dev.HasHardwareEffects && fx.KeyboardEffect is not null) || (fx.ZoneAction is not null && dev.Zones.Count > 0),
+    };
+
+    public async Task RenameZoneAsync(LightDevice dev, LightZone zone, string name)
+    {
+        zone.Name = name;
+        await Run(b => b.SetLightName(dev.Index, zone.Id, name, zone.Flags));
+    }
+
+    public async Task<LightZone> AddZoneAsync(LightDevice dev, ushort id, string name)
+    {
+        var zone = new LightZone { Id = id, Name = name };
+        dev.Zones.Add(zone);
+        await Run(b => b.SetLightName(dev.Index, id, name, 0));
+        return zone;
+    }
+
+    /// <summary>Lights a single light id (others off) so the user can find out which physical light it is.</summary>
+    public Task ProbeLightAsync(LightDevice dev, ushort id, Rgb color) => Run(b =>
+    {
+        _engine.Stop();
+        b.SetColor(dev.Index, id, color);
+        b.Update(dev.Index);
+    });
+
+    public void Dispose()
+    {
+        _engine.Stop();
+        try { Backend.Close(); } catch { /* shutting down */ }
+    }
+}

@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="NightGlow.Pages.LightingPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="using:NightGlow.Core"
+    xmlns:local="using:NightGlow.Pages"
+    Background="Transparent">
+
+    <Page.Resources>
+        <Flyout x:Key="ZoneFlyoutRes" x:Name="ZoneFlyout">
+            <StackPanel Spacing="10">
+                <ColorPicker x:Name="ZonePicker" IsAlphaEnabled="False" ColorSpectrumShape="Ring" />
+                <TextBox x:Name="ZoneNameBox" Header="名称" />
+                <Button Content="应用" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Right" Click="ApplyZone_Click" />
+            </StackPanel>
+        </Flyout>
+    </Page.Resources>
+
+    <Grid Padding="36,24,36,24" ColumnSpacing="20" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.ColumnSpan="2" Spacing="4">
+            <TextBlock Text="灯光" Style="{StaticResource NgPageTitle}" />
+            <TextBlock Text="给每个灯区设置静态颜色，调节亮度。动态效果在“灯效”页。" Style="{StaticResource NgMuted}" />
+        </StackPanel>
+
+        <!-- devices -->
+        <ListView x:Name="DeviceListView" Grid.Row="1" SelectionMode="Single" SelectionChanged="DeviceListView_SelectionChanged">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="core:LightDevice">
+                    <Grid ColumnSpacing="12" Padding="4,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="36" Height="36" CornerRadius="9" Background="{StaticResource NgGlowBrush}">
+                            <FontIcon Glyph="{x:Bind Glyph}" Foreground="White" FontSize="16" />
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind Kind}" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource NgMuted}" FontSize="12">
+                                <Run Text="{x:Bind IdText}" /><Run Text=" · " /><Run Text="{x:Bind ApiText}" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- details -->
+        <ScrollViewer Grid.Row="1" Grid.Column="1">
+            <StackPanel x:Name="DetailPanel" Spacing="16" Padding="0,0,12,24">
+
+                <Border Style="{StaticResource NgCard}">
+                    <Grid ColumnSpacing="16" RowSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Name="DevTitle" Text="选择一个设备" Style="{StaticResource NgSectionTitle}" Margin="0" />
+                            <TextBlock x:Name="DevSub" Style="{StaticResource NgMuted}" FontSize="12" />
+                        </StackPanel>
+                        <Button Grid.Column="1" x:Name="WholeColorButton" VerticalAlignment="Center" ToolTipService.ToolTip="整个设备设为同一颜色">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border x:Name="WholeSwatch" Width="18" Height="18" CornerRadius="4" Background="#35D6E8" />
+                                <TextBlock Text="整机颜色" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <Flyout x:Name="WholeFlyout">
+                                    <StackPanel Spacing="10">
+                                        <ColorPicker x:Name="WholePicker" IsAlphaEnabled="False" IsMoreButtonVisible="True" ColorSpectrumShape="Ring" />
+                                        <Button Content="应用到整个设备" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Right" Click="ApplyWhole_Click" />
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="4">
+                            <TextBlock Text="亮度" Style="{StaticResource NgMuted}" />
+                            <Slider x:Name="BrightnessSlider" Minimum="0" Maximum="100" StepFrequency="5" Value="100"
+                                    ValueChanged="BrightnessSlider_ValueChanged" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <InfoBar x:Name="NoZonesInfo" Severity="Informational" IsClosable="False" Title="还没有命名的灯区"
+                         Message="这个设备的灯区编号还不知道。整机颜色和硬件灯效可以直接用；要给单个灯区设颜色，先在下面“灯区标定”里逐个点亮编号并命名。" />
+
+                <StackPanel x:Name="ZonesSection" Spacing="10">
+                    <TextBlock Text="灯区" Style="{StaticResource NgSectionTitle}" Margin="0" />
+                    <ItemsControl x:Name="ZoneList">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="local:ZoneRow">
+                                <Border Style="{StaticResource NgCard}" Padding="14,10">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="28" Height="28" CornerRadius="14" Background="{x:Bind Brush, Mode=OneWay}"
+                                                BorderBrush="{ThemeResource NgCardBorderBrush}" BorderThickness="1" />
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind Name, Mode=OneWay}" />
+                                            <TextBlock Style="{StaticResource NgMuted}" FontSize="12">
+                                                <Run Text="编号 " /><Run Text="{x:Bind IdText}" /><Run Text="{x:Bind FlagText}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Content="颜色" Click="ZoneColor_Click" Tag="{x:Bind}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <Expander x:Name="CalibExpander" Header="灯区标定" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource NgMuted}"
+                                   Text="输入一个编号点亮它，看看是哪个灯，再起个名字保存。名字和 alien-tools 共用同一个存储位置。" />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <NumberBox x:Name="ProbeId" Header="编号" Minimum="0" Maximum="255" Value="0" SpinButtonPlacementMode="Inline" Width="150" />
+                            <Button Content="点亮" VerticalAlignment="Bottom" Click="Probe_Click" />
+                            <Button Content="下一个" VerticalAlignment="Bottom" Click="ProbeNext_Click" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBox x:Name="ProbeName" Header="名称" PlaceholderText="比如：背部灯带左" Width="260" />
+                            <Button Content="保存为灯区" VerticalAlignment="Bottom" Style="{StaticResource AccentButtonStyle}" Click="SaveZone_Click" />
+                        </StackPanel>
+                        <TextBlock x:Name="ProbeStatus" Style="{StaticResource NgMuted}" FontSize="12" />
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
