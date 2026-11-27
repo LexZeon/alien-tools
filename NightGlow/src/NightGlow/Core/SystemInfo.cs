@@ -21,7 +21,8 @@ public static class SystemInfo
         if (exe is null) return false;
         try
         {
-            Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true, Verb = "runas" });
+            // "--elevated" lets the new instance wait for this one to exit (single-instance guard)
+            Process.Start(new ProcessStartInfo(exe, "--elevated --page=performance") { UseShellExecute = true, Verb = "runas" });
             return true;
         }
         catch (System.ComponentModel.Win32Exception)

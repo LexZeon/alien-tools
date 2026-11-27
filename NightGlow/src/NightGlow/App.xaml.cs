@@ -26,8 +26,46 @@ public partial class App : Application
         TaskScheduler.UnobservedTaskException += (_, e) => { CrashLog.Write("task", e.Exception); e.SetObserved(); };
     }
 
+    private static Mutex? _singleInstance;
+
+    /// <summary>
+    /// Only one NightGlow may drive the lights: two instances writing at the same time make
+    /// the LEDs flicker. A second launch brings the running window to the front and quits.
+    /// An elevated relaunch ("--elevated") waits for the instance that started it to exit.
+    /// </summary>
+    private static bool TakeSingleInstance()
+    {
+        try
+        {
+            _singleInstance = new Mutex(true, @"Local\NightGlow.SingleInstance", out bool created);
+            if (created) return true;
+            if (!Environment.GetCommandLineArgs().Contains("--elevated")) return false;
+            try { return _singleInstance.WaitOne(TimeSpan.FromSeconds(10)); }
+            catch (AbandonedMutexException) { return true; } // the old instance exited without releasing
+        }
+        catch (UnauthorizedAccessException) { return false; } // held by an elevated instance
+    }
+
+    private static void ActivateRunningInstance()
+    {
+        var self = Environment.ProcessId;
+        foreach (var p in System.Diagnostics.Process.GetProcessesByName("NightGlow"))
+        {
+            if (p.Id == self || p.MainWindowHandle == IntPtr.Zero) continue;
+            NativeWindowMethods.ShowWindow(p.MainWindowHandle, 9); // SW_RESTORE
+            NativeWindowMethods.SetForegroundWindow(p.MainWindowHandle);
+            break;
+        }
+    }
+
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
+        if (!TakeSingleInstance())
+        {
+            ActivateRunningInstance();
+            Exit();
+            return;
+        }
         try
         {
             // Services first: pages use them as soon as the window navigates.
@@ -54,6 +92,17 @@ public partial class App : Application
             throw;
         }
     }
+}
+
+internal static partial class NativeWindowMethods
+{
+    [System.Runtime.InteropServices.LibraryImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    internal static partial bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [System.Runtime.InteropServices.LibraryImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    internal static partial bool SetForegroundWindow(IntPtr hWnd);
 }
 
 internal static class CrashLog
