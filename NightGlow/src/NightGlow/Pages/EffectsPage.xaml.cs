@@ -92,10 +92,12 @@ public sealed partial class EffectsPage : Page, IRefreshable
         _loading = false;
         Refresh();
         _previewTimer.Start();
+        MaybeAutoStartDemo();
     }
 
     protected override void OnNavigatedFrom(NavigationEventArgs e)
     {
+        StopDemo();
         _previewTimer.Stop();
         if (_applyTimer.IsEnabled) { _applyTimer.Stop(); _ = ApplyNowAsync(); }
         App.Lighting.LayoutChanged -= Lighting_LayoutChanged;
@@ -325,7 +327,109 @@ public sealed partial class EffectsPage : Page, IRefreshable
 
     private void Stop_Click(object sender, RoutedEventArgs e)
     {
+        StopDemo();
         App.Lighting.StopSoftwareEffect();
         ApplyStatus.Text = "软件灯效已停止，灯光保持最后一帧。";
+    }
+
+    // ---- one-click showcase: plays the effects one after another, with a caption ----
+
+    private sealed record DemoStep(string FxId, WaveDirection Dir, string Palette, double Seconds, string Caption, string CaptionZh, bool Drops = false);
+
+    private static readonly DemoStep[] DemoSteps =
+    {
+        new("sp-wave", WaveDirection.LeftToRight, "rainbow", 5, "🌈 One rainbow across every zone", "彩虹波 · 键盘、触控板、Logo、背部灯环连成一片"),
+        new("sp-wave", WaveDirection.Clockwise, "rainbow", 4, "🔄 Around the rear ring", "顺时针环绕"),
+        new("sp-wave", WaveDirection.CenterOut, "aurora", 4, "🎨 8 directions · palettes", "8 个方向 · 一键换配色"),
+        new("sp-ripple", WaveDirection.LeftToRight, "rainbow", 8, "💧 Click anywhere for ripples", "点哪里，就从哪里荡开涟漪", Drops: true),
+        new("sp-nebula", WaveDirection.LeftToRight, "nebula", 5, "🌌 Nebula", "星云"),
+        new("sp-aurora", WaveDirection.LeftToRight, "aurora", 5, "🌠 Aurora", "极光"),
+        new("sp-laser", WaveDirection.LeftToRight, "ember", 4, "⚡ Laser scan with trails", "激光扫描 · 带拖影"),
+        new("sp-fire", WaveDirection.LeftToRight, "rainbow", 5, "🔥 Fire", "火焰"),
+        new("sp-plasma", WaveDirection.LeftToRight, "rainbow", 4, "🔮 Plasma", "等离子"),
+        new("sp-wave", WaveDirection.LeftToRight, "sakura", 4, "⌨️ Per-key, 40 fps, mapped on real hardware", "逐键 40 帧 · 键位在真机上实测"),
+        new("sp-wave", WaveDirection.LeftToRight, "rainbow", 4, "NightGlow · open source · MIT", "开源 · MIT 许可"),
+    };
+
+    /// <summary>Where the showcase drops its ripples (keyboard, rear ring, touchpad, corners).</summary>
+    private static readonly (double X, double Y)[] DemoDrops =
+        { (0.30, 0.50), (0.72, 0.46), (0.50, 0.12), (0.50, 0.89), (0.16, 0.66), (0.85, 0.60), (0.50, 0.55), (0.26, 0.13) };
+
+    private DispatcherTimer? _demoTimer;
+    private int _demoStep, _dropIndex;
+    private DateTime _demoStepEnd, _nextDrop;
+    private static bool _demoAutoStarted;
+
+    private void Demo_Click(object sender, RoutedEventArgs e)
+    {
+        if (_demoTimer is null) StartDemo();
+        else StopDemo();
+    }
+
+    private void StartDemo()
+    {
+        foreach (var chip in _chips.Where(c => c.IsAvailable)) chip.IsChecked = true;
+        _demoStep = -1;
+        _demoTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _demoTimer.Tick += DemoTick;
+        DemoButtonText.Text = "停止演示";
+        DemoCaptionBox.Visibility = Visibility.Visible;
+        NextDemoStep();
+        _demoTimer.Start();
+    }
+
+    private void NextDemoStep()
+    {
+        _demoStep++;
+        if (_demoStep >= DemoSteps.Length)
+        {
+            StopDemo();
+            return;
+        }
+        var s = DemoSteps[_demoStep];
+        RainSwitch.IsOn = false;
+        DirectionBox.SelectedIndex = Math.Max(0, Array.FindIndex(WaveDirections.All, d => d.Dir == s.Dir));
+        PaletteGrid.SelectedItem = Palette.All.FirstOrDefault(p => p.Id == s.Palette) ?? Palette.All[0];
+        EffectGrid.SelectedItem = EffectCatalog.Find(s.FxId);
+        if (EffectGrid.SelectedItem is not null) EffectGrid.ScrollIntoView(EffectGrid.SelectedItem);
+        DemoCaption.Text = s.Caption;
+        DemoCaptionZh.Text = s.CaptionZh;
+        _demoStepEnd = DateTime.Now.AddSeconds(s.Seconds);
+        _nextDrop = DateTime.Now.AddSeconds(0.6);
+        ScheduleApply();
+    }
+
+    private void DemoTick(object? sender, object e)
+    {
+        if (_demoStep < 0 || _demoStep >= DemoSteps.Length) return;
+        var s = DemoSteps[_demoStep];
+        if (s.Drops && DateTime.Now >= _nextDrop)
+        {
+            var (x, y) = DemoDrops[_dropIndex++ % DemoDrops.Length];
+            App.Lighting.Ripples.Add(x, y);
+            _nextDrop = DateTime.Now.AddSeconds(1.1);
+        }
+        if (DateTime.Now >= _demoStepEnd) NextDemoStep();
+    }
+
+    private void StopDemo()
+    {
+        if (_demoTimer is null) return;
+        _demoTimer.Stop();
+        _demoTimer = null;
+        DemoButtonText.Text = "一键演示";
+        DemoCaptionBox.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>"NightGlow.exe --showcase" starts the showcase once, a moment after the page opens.</summary>
+    internal static bool IsShowcase => Environment.GetCommandLineArgs().Contains("--showcase");
+
+    private void MaybeAutoStartDemo()
+    {
+        if (_demoAutoStarted || !IsShowcase) return;
+        _demoAutoStarted = true;
+        var once = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        once.Tick += (_, _) => { once.Stop(); StartDemo(); };
+        once.Start();
     }
 }

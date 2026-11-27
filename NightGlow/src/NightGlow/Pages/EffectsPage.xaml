@@ -31,6 +31,13 @@
                 <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Padding="8,3" CornerRadius="6" Background="#AA000000" IsHitTestVisible="False">
                     <TextBlock x:Name="CanvasHint" FontSize="12" Foreground="#CCFFFFFF" Text="点击区域选中或取消" />
                 </Border>
+                <Border x:Name="DemoCaptionBox" HorizontalAlignment="Left" VerticalAlignment="Top" Padding="16,8" CornerRadius="10"
+                        Background="#D9000000" IsHitTestVisible="False" Visibility="Collapsed">
+                    <StackPanel Spacing="2">
+                        <TextBlock x:Name="DemoCaption" FontSize="24" FontWeight="SemiBold" Foreground="White" />
+                        <TextBlock x:Name="DemoCaptionZh" FontSize="16" Foreground="#CCFFFFFF" />
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 
@@ -152,6 +159,10 @@
                         <Slider x:Name="BrightSlider" Minimum="10" Maximum="100" StepFrequency="5" ValueChanged="Param_Changed" />
                     </StackPanel>
 
+                    <Button x:Name="DemoButton" Click="Demo_Click" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch"
+                            ToolTipService.ToolTip="自动依次展示各种灯效，约 75 秒；再点一次停止">
+                        <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE768;" FontSize="14" /><TextBlock x:Name="DemoButtonText" Text="一键演示" /></StackPanel>
+                    </Button>
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button x:Name="ApplyButton" Click="Apply_Click" ToolTipService.ToolTip="改动会自动应用；灯光和预览不一致时点这里再发送一次">
                             <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE72C;" FontSize="14" /><TextBlock Text="重新应用" /></StackPanel>
