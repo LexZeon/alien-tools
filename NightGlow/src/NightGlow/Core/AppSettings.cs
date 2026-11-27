@@ -23,6 +23,9 @@ public sealed class AppSettings
     /// <summary>"VID:PID/id" -> region assignment ("ring:3", "logo", "other", "keyboard:1", "none").</summary>
     public Dictionary<string, string> LightRegions { get; set; } = new();
 
+    /// <summary>"VID:PID/id" -> light name. The shared alien-tools store keeps only the ANSI code page.</summary>
+    public Dictionary<string, string> ZoneNames { get; set; } = new();
+
     /// <summary>"VID:PID/id" -> key scan code (extended keys + 0xE000), from key calibration.</summary>
     public Dictionary<string, int> KeyMap { get; set; } = new();
 

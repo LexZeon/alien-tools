@@ -72,7 +72,10 @@
                     </StackPanel>
 
                     <StackPanel Spacing="6">
-                        <TextBlock Text="区域" Style="{StaticResource NgMuted}" />
+                        <Grid>
+                            <TextBlock Text="区域（亮蓝 = 已选中）" Style="{StaticResource NgMuted}" VerticalAlignment="Center" />
+                            <HyperlinkButton Content="全选" HorizontalAlignment="Right" Padding="6,2" Click="SelectAll_Click" />
+                        </Grid>
                         <ItemsControl x:Name="RegionList" Height="140">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>

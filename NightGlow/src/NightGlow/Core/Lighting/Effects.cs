@@ -108,8 +108,8 @@ public static class EffectCatalog
         new("default-blue", "默认蓝", "一键恢复成蓝色静态灯光，不需要选颜色", EffectKind.Hardware, "", 0, false,
             HardwareEffect.Static, ColorMode.One, LightActionType.Color, new[] { "#0A5CFF", "#0A5CFF" })
             { FixedColor = DefaultBlue },
-        new("rainbow-wave", "硬件彩虹波", "关掉 NightGlow 也保持。键盘用固件彩虹波（方向固定、较生硬）；灯环每段错开相位形成流动。要丝滑请用软件的彩虹波", EffectKind.Hardware, "", 0, true,
-            HardwareEffect.SideWave, ColorMode.Spectrum, LightActionType.Morph, Rainbow, HasDirection: true, HasPalette: true),
+        new("rainbow-wave", "硬件彩虹波", "关掉 NightGlow 也保持。颜色和方向由键盘固件决定，不能改；要换配色、方向或更丝滑，请用软件的彩虹波", EffectKind.Hardware, "", 0, true,
+            HardwareEffect.SideWave, ColorMode.Spectrum, LightActionType.Morph, Rainbow),
         new("breathing", "呼吸", "颜色缓慢亮起再熄灭", EffectKind.Hardware, "", 1, true,
             HardwareEffect.Breathing, ColorMode.One, LightActionType.Breathing, new[] { "#101018", "#8B5CF6", "#101018" }),
         new("spectrum", "光谱循环", "所有灯区一起在全色谱中循环（硬件）", EffectKind.Hardware, "", 0, true,

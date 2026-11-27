@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:core="using:NightGlow.Core"
     xmlns:local="using:NightGlow.Pages"
+    xmlns:ctl="using:NightGlow.Controls"
     Background="Transparent">
 
     <Page.Resources>
@@ -98,10 +99,10 @@
                 <InfoBar x:Name="NoZonesInfo" Severity="Informational" IsClosable="False" Title="还没有识别灯区"
                          Message="整机颜色和硬件灯效可以直接用。想按“背部灯环 / Logo”选区域、玩流动和涟漪，先用下面的“灯光识别向导”点几下就好。" />
 
-                <Expander x:Name="IdentifyExpander" Header="灯光识别向导（找出背部灯环和 Logo）" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Expander x:Name="IdentifyExpander" Header="灯光识别向导（找出背部灯环、Logo、触控板）" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                     <StackPanel Spacing="12">
                         <TextBlock Style="{StaticResource NgMuted}" TextWrapping="Wrap"
-                                   Text="每次只点亮一个灯（白色）。看它亮在哪里，点对应的按钮就行；没亮就点“没亮”。灯环会按识别顺序排好，最后可以用“测试流动”检查方向。" />
+                                   Text="每次只点亮一个灯（白色）。在笔记本示意图上点它亮的位置：灯环上点准位置，NightGlow 就知道它在环上的哪里。没亮按空格。电源键请点“电源键”，以后任何灯效都不会碰它。" />
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <Button x:Name="IdStartButton" Content="开始识别" Style="{StaticResource AccentButtonStyle}" Click="IdStart_Click" />
                             <Button x:Name="IdStopButton" Content="完成" Click="IdStop_Click" IsEnabled="False" />
@@ -109,12 +110,11 @@
                         <Border Padding="16,14" CornerRadius="8" Background="{ThemeResource NgCardBrush}" BorderBrush="{ThemeResource NgCardBorderBrush}" BorderThickness="1">
                             <StackPanel Spacing="12">
                                 <TextBlock x:Name="IdPrompt" Text="点“开始识别”。" TextWrapping="Wrap" />
+                                <ctl:LaptopCanvas x:Name="IdCanvas" Height="230" Visibility="Collapsed" />
                                 <StackPanel x:Name="IdChoices" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
-                                    <Button Content="背部灯环" Tag="ring" Click="IdChoice_Click" Style="{StaticResource AccentButtonStyle}" />
-                                    <Button Content="Logo" Tag="logo" Click="IdChoice_Click" />
-                                    <Button Content="触控板" Tag="touchpad" Click="IdChoice_Click" />
+                                    <Button x:Name="IdSkipButton" Content="没亮（空格）" Tag="skip" Click="IdChoice_Click" Style="{StaticResource AccentButtonStyle}" />
+                                    <Button Content="电源键" Tag="power" Click="IdChoice_Click" />
                                     <Button Content="其他灯" Tag="other" Click="IdChoice_Click" />
-                                    <Button Content="没亮" Tag="skip" Click="IdChoice_Click" />
                                 </StackPanel>
                             </StackPanel>
                         </Border>

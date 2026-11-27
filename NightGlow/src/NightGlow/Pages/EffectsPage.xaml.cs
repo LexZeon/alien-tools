@@ -120,6 +120,11 @@ public sealed partial class EffectsPage : Page, IRefreshable
 
     private IEnumerable<RegionKind> SelectedKinds => _chips.Where(c => c.IsChecked && c.IsAvailable).Select(c => c.Kind);
 
+    private void SelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var chip in _chips.Where(c => c.IsAvailable)) chip.IsChecked = true;
+    }
+
     private void Chip_CheckedChanged(object? sender, EventArgs e)
     {
         LaptopView.SetSelected(SelectedKinds);
@@ -314,7 +319,8 @@ public sealed partial class EffectsPage : Page, IRefreshable
         var names = string.Join("、", kinds.Select(Regions.Name));
         ApplyStatus.Text = App.Lighting.IsSimulated
             ? $"演示模式：“{fx.Name}”→ {names}（没有发送到硬件）。"
-            : $"已应用“{fx.Name}”→ {names}。" + (fx.Kind == EffectKind.Software ? "关闭 NightGlow 后灯光停在最后一帧。" : "");
+            : $"已应用“{fx.Name}”→ {names}。" + (fx.Kind == EffectKind.Software ? "关闭 NightGlow 后灯光停在最后一帧。" : "")
+              + (!kinds.Contains(RegionKind.Keyboard) && App.Lighting.Layout.Get(RegionKind.Keyboard) is not null ? " 注意：键盘没有选中，键盘不会变。" : "");
     }
 
     private void Stop_Click(object sender, RoutedEventArgs e)

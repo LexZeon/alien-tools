@@ -43,6 +43,28 @@ public sealed class LaptopCanvas : Grid
     /// <summary>When true, clicks report a position (for ripples) instead of toggling regions.</summary>
     public bool InteractiveMode { get; set; }
 
+    /// <summary>
+    /// Light identification: a click reports which region was hit (even if it has no lights yet)
+    /// and, for the ring, the position along the loop (0..1).
+    /// </summary>
+    public bool PickMode { get; set; }
+
+    public event EventHandler<(RegionKind Kind, double Along)>? Picked;
+
+    /// <summary>Position along the ring loop closest to a canvas point.</summary>
+    private static double NearestAlong(double x, double y)
+    {
+        double best = 0, bestD = double.MaxValue;
+        for (int i = 0; i < 400; i++)
+        {
+            double s = i / 400.0;
+            var (px, py) = SpatialLayout.StadiumPoint(SpatialLayout.RingFrame, s);
+            double d = Math.Pow((px - x) * SpatialLayout.Aspect, 2) + Math.Pow(py - y, 2);
+            if (d < bestD) { bestD = d; best = s; }
+        }
+        return best;
+    }
+
     public LaptopCanvas()
     {
         Children.Add(new Viewbox { Stretch = Stretch.Uniform, Child = _canvas });
@@ -285,6 +307,12 @@ public sealed class LaptopCanvas : Grid
     {
         var p = e.GetPosition(_canvas);
         double x = p.X / DW, y = p.Y / DH;
+        if (PickMode)
+        {
+            if (HitRegion(x, y) is { } hit)
+                Picked?.Invoke(this, (hit, hit == RegionKind.Ring ? NearestAlong(x, y) : 0));
+            return;
+        }
         if (InteractiveMode)
         {
             SurfaceTapped?.Invoke(this, (x, y));

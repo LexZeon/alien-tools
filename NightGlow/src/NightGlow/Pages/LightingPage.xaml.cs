@@ -76,6 +76,8 @@ public sealed partial class LightingPage : Page, IRefreshable
     {
         InitializeComponent();
         ZoneList.ItemsSource = _rows;
+        IdCanvas.PickMode = true;
+        IdCanvas.Picked += IdCanvas_Picked;
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e) => Refresh();
@@ -138,9 +140,17 @@ public sealed partial class LightingPage : Page, IRefreshable
     // ---- light identification wizard (chassis lights) ----
 
     private bool _idActive;
-    private int _idCur;
+    private int _idPos;
     private int? _idLit;
-    private const int MaxLightId = 63;
+
+    /// <summary>
+    /// Light ids to try, most likely first. On the x16 R2 the ring is spread over 0..47 and the
+    /// logo sits in 64..95; 48..63 and 96..127 come last. The user can stop at any time.
+    /// </summary>
+    private static readonly int[] IdOrder = Enumerable.Range(0, 48).Concat(Enumerable.Range(64, 32))
+        .Concat(Enumerable.Range(48, 16)).Concat(Enumerable.Range(96, 32)).ToArray();
+
+    private int CurrentId => IdOrder[Math.Min(_idPos, IdOrder.Length - 1)];
 
     /// <summary>Ring zones of the current device, in ring order.</summary>
     private List<(ushort Id, int Order)> RingZones()
@@ -167,11 +177,13 @@ public sealed partial class LightingPage : Page, IRefreshable
         // start over: forget earlier ring/logo assignments of this device
         foreach (var z in _device.Zones) App.Settings.LightRegions.Remove(Key(_device, z.Id));
         _idActive = true;
-        _idCur = 0;
+        _idPos = 0;
         _idLit = null;
         IdStartButton.IsEnabled = false;
         IdStopButton.IsEnabled = true;
         IdChoices.Visibility = Visibility.Visible;
+        IdCanvas.Visibility = Visibility.Visible;
+        IdCanvas.SetLayout(App.Lighting.Layout);
         await App.Lighting.SetDeviceColorAsync(_device, Rgb.Black);
         await LightCurrent();
     }
@@ -179,25 +191,48 @@ public sealed partial class LightingPage : Page, IRefreshable
     private async Task LightCurrent()
     {
         if (_device is null) return;
-        if (_idCur > MaxLightId) { EndIdentify(rebuild: true); return; }
+        if (_idPos >= IdOrder.Length) { EndIdentify(rebuild: true); return; }
         if (_idLit is { } prev) await App.Lighting.ProbeLightAsync(_device, (ushort)prev, Rgb.Black);
-        await App.Lighting.ProbeLightAsync(_device, (ushort)_idCur, Rgb.White);
-        _idLit = _idCur;
-        IdPrompt.Text = $"编号 {_idCur} 亮了吗？它在哪里？" + (App.Lighting.IsSimulated ? "（演示模式不会真的亮灯）" : "");
+        await App.Lighting.ProbeLightAsync(_device, (ushort)CurrentId, Rgb.White);
+        _idLit = CurrentId;
+        // keep focus on "not lit", so Space skips dark ids quickly
+        IdSkipButton.Focus(FocusState.Programmatic);
+        IdPrompt.Text = $"第 {_idPos + 1}/{IdOrder.Length} 个（编号 {CurrentId}）亮了吗？在下面的图上点它亮的位置（灯环上尽量点准）；" +
+                        "不在图上就点“其他灯”，没亮就点“没亮”或按空格。找齐了可以随时点“完成”。" +
+                        (App.Lighting.IsSimulated ? "（演示模式不会真的亮灯）" : "");
     }
 
     private async void IdChoice_Click(object sender, RoutedEventArgs e)
     {
-        if (!_idActive || _device is null || (sender as FrameworkElement)?.Tag is not string choice) return;
-        var id = (ushort)_idCur;
+        if ((sender as FrameworkElement)?.Tag is string choice) await AssignCurrent(choice, null);
+    }
+
+    private async void IdCanvas_Picked(object? sender, (RegionKind Kind, double Along) pick)
+    {
+        var choice = pick.Kind switch
+        {
+            RegionKind.Ring => "ring",
+            RegionKind.Logo => "logo",
+            RegionKind.Touchpad => "touchpad",
+            _ => "other",
+        };
+        await AssignCurrent(choice, pick.Kind == RegionKind.Ring ? pick.Along : null);
+    }
+
+
+    private async Task AssignCurrent(string choice, double? along)
+    {
+        if (!_idActive || _device is null) return;
+        var id = (ushort)CurrentId;
         if (choice != "skip")
         {
             int ringCount = RingZones().Count;
             var (name, assign) = choice switch
             {
-                "ring" => ($"灯环 {ringCount + 1}", $"ring:{ringCount}"),
+                "ring" => ($"灯环 {ringCount + 1}", along is { } a ? SpatialLayout.RingAt(a) : $"ring:{ringCount}"),
                 "logo" => ("Logo", "logo"),
                 "touchpad" => ("触控板", "touchpad"),
+                "power" => ("电源键", "none"), // never driven by effects
                 _ => ($"灯 {id}", "other"),
             };
             var zone = _device.Zones.FirstOrDefault(z => z.Id == id);
@@ -205,9 +240,13 @@ public sealed partial class LightingPage : Page, IRefreshable
             else await App.Lighting.RenameZoneAsync(_device, zone, name);
             App.Settings.LightRegions[Key(_device, id)] = assign;
             App.Settings.Save();
+            App.Lighting.RebuildLayout();
+            IdCanvas.SetLayout(App.Lighting.Layout);
+            IdCanvas.SetSelected(Regions.All);
+            IdCanvas.Render(pt => pt.Device.Index == _device.Index ? new Rgb(0x35, 0xD6, 0xE8) : null);
             IdStatus.Text = $"编号 {id} → {name}";
         }
-        _idCur++;
+        _idPos++;
         await LightCurrent();
     }
 
@@ -220,6 +259,7 @@ public sealed partial class LightingPage : Page, IRefreshable
         IdStartButton.IsEnabled = true;
         IdStopButton.IsEnabled = false;
         IdChoices.Visibility = Visibility.Collapsed;
+        IdCanvas.Visibility = Visibility.Collapsed;
         IdPrompt.Text = "点“开始识别”。";
         if (rebuild && _device is not null)
         {

@@ -80,16 +80,14 @@ public sealed class SpatialLayout
     };
 
     /// <summary>
-    /// Chassis lights of the Alienware x16 R2 as the vendor control center numbers them
-    /// (rear "stadium" ring drawn as four corners, lid logo, touchpad, power button).
-    /// Used until the user identifies the lights. Not yet confirmed one by one on hardware;
-    /// a first test lit the ring in two colors when ids &lt; 32 and &gt;= 32 differed, which fits.
+    /// Chassis lights of the Alienware x16 R2 confirmed on hardware: id 0 is on the rear ring,
+    /// id 62 is the touchpad corner light. The vendor app's own LED numbers do not match the
+    /// hardware ids (its "061" logo is in the 64..95 range), so nothing else is guessed;
+    /// the identification wizard places the rest. Used only for ids the user has not identified.
     /// </summary>
     private static readonly (ushort Id, RegionKind Kind, int Order, string Name)[] X16R2Chassis =
     {
-        (0, RegionKind.Ring, 0, "灯环 左上"), (3, RegionKind.Ring, 1, "灯环 右上"),
-        (33, RegionKind.Ring, 2, "灯环 右下"), (30, RegionKind.Ring, 3, "灯环 左下"),
-        (61, RegionKind.Logo, 0, "外星人头"), (62, RegionKind.Touchpad, 0, "触控板"), (60, RegionKind.Other, 0, "电源键"),
+        (0, RegionKind.Ring, 0, "灯环 0"), (62, RegionKind.Touchpad, 0, "触控板"),
     };
 
     /// <summary>Per-key keyboards (API v5) number keys row by row, 16 ids per row (seen on the x16 R2).</summary>
@@ -116,14 +114,23 @@ public sealed class SpatialLayout
 
     // ---- building ----
 
-    /// <summary>Stored assignment: "ring:3", "keyboard:1", "logo", "other" or "none".</summary>
+    /// <summary>
+    /// Stored assignment: "ring:3" (ring, 4th in order), "ring@250" (ring, placed by the user at
+    /// 25% of the loop), "keyboard:1", "logo", "touchpad", "other" or "none".
+    /// </summary>
     public static (RegionKind? Kind, int Order) ParseAssignment(string? s)
     {
         if (string.IsNullOrWhiteSpace(s) || s == "none") return (null, 0);
-        var parts = s.Split(':');
+        var parts = s.Split(':', '@');
         int order = parts.Length > 1 && int.TryParse(parts[1], out var o) ? o : 0;
         return Enum.TryParse<RegionKind>(parts[0], true, out var k) ? (k, order) : (null, 0);
     }
+
+    /// <summary>Exact position on the ring loop (0..1) for "ring@NNN" assignments.</summary>
+    public static double? ExactAlong(string? s) =>
+        s is not null && s.StartsWith("ring@", StringComparison.Ordinal) && int.TryParse(s.AsSpan(5), out var v) ? v / 1000.0 : null;
+
+    public static string RingAt(double along) => $"ring@{(int)Math.Round((along - Math.Floor(along)) * 1000)}";
 
     public static string FormatAssignment(RegionKind? kind, int order) =>
         kind is null ? "none" : kind is RegionKind.Ring or RegionKind.Keyboard ? $"{kind.Value.ToString().ToLowerInvariant()}:{order}" : kind.Value.ToString().ToLowerInvariant();
@@ -145,7 +152,7 @@ public sealed class SpatialLayout
 
     public static SpatialLayout Build(IEnumerable<LightDevice> devices, AppSettings s, bool simulated, string model = "")
     {
-        var ring = new List<(LightDevice Dev, LightZone Z, int Order)>();
+        var ring = new List<(LightDevice Dev, LightZone Z, int Order, double? Exact)>();
         var logo = new List<(LightDevice Dev, LightZone Z)>();
         var other = new List<(LightDevice Dev, LightZone Z)>();
         var touchpad = new List<(LightDevice Dev, LightZone Z)>();
@@ -166,12 +173,11 @@ public sealed class SpatialLayout
 
             foreach (var (z, guess, guessOrder) in zones)
             {
-                var (kind, order) = s.LightRegions.TryGetValue(Key(dev, z.Id), out var a)
-                    ? ParseAssignment(a)
-                    : (guess, guessOrder);
+                s.LightRegions.TryGetValue(Key(dev, z.Id), out var a);
+                var (kind, order) = a is not null ? ParseAssignment(a) : (guess, guessOrder);
                 switch (kind) // null = the user excluded this light
                 {
-                    case RegionKind.Ring: ring.Add((dev, z, order)); break;
+                    case RegionKind.Ring: ring.Add((dev, z, order, ExactAlong(a))); break;
                     case RegionKind.Logo: logo.Add((dev, z)); break;
                     case RegionKind.Keyboard: kbZones.Add((dev, z, order)); break;
                     case RegionKind.Touchpad: touchpad.Add((dev, z)); break;
@@ -207,10 +213,12 @@ public sealed class SpatialLayout
         if (ring.Count > 0)
         {
             var r = new LightRegion { Kind = RegionKind.Ring };
-            var sorted = ring.OrderBy(x => x.Order).ThenBy(x => x.Z.Id).ToList();
+            // lights placed by the user keep their exact spot; the rest are spread evenly by order
+            var sorted = ring.OrderBy(x => x.Exact ?? 2).ThenBy(x => x.Order).ThenBy(x => x.Z.Id).ToList();
+            int loose = sorted.Count(x => x.Exact is null), li = 0;
             for (int i = 0; i < sorted.Count; i++)
             {
-                double along = (i + 0.5) / sorted.Count;
+                double along = sorted[i].Exact ?? (li++ + 0.5) / loose;
                 var (x, y) = StadiumPoint(RingFrame, along);
                 r.Points.Add(new LayoutPoint(sorted[i].Dev, sorted[i].Z.Id, RegionKind.Ring, x, y, 0.03, 0.045, along, sorted[i].Z.Name));
             }

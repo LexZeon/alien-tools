@@ -71,8 +71,20 @@ public sealed partial class LightingService : ObservableObject, IDisposable
     {
         var list = await Run(b => b.Open());
         Devices.Clear();
-        foreach (var d in list) Devices.Add(d);
+        foreach (var d in list)
+        {
+            // names saved by NightGlow win: the shared alien-tools store keeps only the ANSI code page
+            foreach (var z in d.Zones)
+                if (_settings.ZoneNames.TryGetValue(SpatialLayout.Key(d, z.Id), out var name)) z.Name = name;
+            Devices.Add(d);
+        }
         RebuildLayout();
+    }
+
+    private void RememberName(LightDevice dev, ushort id, string name)
+    {
+        _settings.ZoneNames[SpatialLayout.Key(dev, id)] = name;
+        _settings.Save();
     }
 
     /// <summary>Call after zone names, region assignments or the key map changed.</summary>
@@ -260,6 +272,7 @@ public sealed partial class LightingService : ObservableObject, IDisposable
     public async Task RenameZoneAsync(LightDevice dev, LightZone zone, string name)
     {
         zone.Name = name;
+        RememberName(dev, zone.Id, name);
         await Run(b => b.SetLightName(dev.Index, zone.Id, name, zone.Flags));
         RebuildLayout();
     }
@@ -268,6 +281,7 @@ public sealed partial class LightingService : ObservableObject, IDisposable
     {
         var zone = new LightZone { Id = id, Name = name };
         dev.Zones.Add(zone);
+        RememberName(dev, id, name);
         await Run(b => b.SetLightName(dev.Index, id, name, 0));
         RebuildLayout();
         return zone;
